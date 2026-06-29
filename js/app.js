@@ -204,7 +204,7 @@ alert(link);
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
 
-  showPaymentChooser(upiLink);
+  showPaymentChooser(link);
 
 });
 
