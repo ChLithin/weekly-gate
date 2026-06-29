@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#12141C" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Weekly Gate</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <header class="gauge">
+    <div class="gauge-row">
+      <span class="gauge-eyebrow">This week</span>
+      <span class="gauge-reset" id="gaugeReset">resets in 7 days</span>
+    </div>
+    <div class="gauge-amount-row">
+      <span class="gauge-amount" id="gaugeAmount">₹1,000</span>
+      <span class="gauge-of" id="gaugeOf">left of ₹1,000</span>
+    </div>
+    <div class="gauge-track">
+      <div class="gauge-fill" id="gaugeFill" style="width: 0%"></div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- SCAN VIEW -->
+    <section id="view-scan" class="view active">
+
+      <div id="scanIdle" class="scan-stage">
+        <div class="scan-placeholder">
+          <p>Point your camera at any UPI QR code. We'll check this week's budget before handing off to your UPI app.</p>
+          <button class="btn btn-primary" id="btnStartScan">Scan a QR code</button>
+        </div>
+      </div>
+
+      <div id="scanLive" class="scan-stage" hidden>
+        <video id="scanVideo" class="scan-video" playsinline muted></video>
+        <canvas id="scanCanvas" hidden></canvas>
+        <div class="scan-frame"></div>
+      </div>
+      <button class="btn btn-ghost" id="btnCancelScan" hidden style="margin-top:10px;">Cancel</button>
+
+      <div id="scanConfirm" class="confirm-card" hidden style="margin-top:16px;">
+        <span class="status-pill" id="confirmPill">Within budget</span>
+        <div class="confirm-merchant" id="confirmMerchant">Merchant</div>
+        <div class="confirm-vpa" id="confirmVpa">vpa@bank</div>
+
+        <input type="number" inputmode="decimal" class="amount-input" id="amountInput" placeholder="Enter amount" hidden />
+        <div class="confirm-amount" id="confirmAmount" hidden>₹0</div>
+
+        <div id="confirmRemainingNote" class="fallback-note" style="display:none;"></div>
+
+        <button class="btn btn-primary" id="btnPay">Pay via UPI app</button>
+        <button class="btn btn-ghost" id="btnRescan" style="margin-top:10px;">Scan something else</button>
+
+        <div class="fallback-note">
+          Tapping Pay opens your UPI app (BHIM, GPay, etc.) with the amount pre-filled — approve it there as usual, PIN or UPI Lite, whichever that app uses.
+          If nothing opens, copy the details and pay manually:
+          <button id="btnCopyVpa">Copy UPI ID</button>
+        </div>
+      </div>
+
+      <div id="scanFollowup" class="confirm-card" hidden style="margin-top:16px;">
+        <div class="confirm-merchant">Did the payment go through?</div>
+        <p style="color:var(--text-dim); font-size:13px; margin:8px 0 16px;">
+          Your UPI app handles the actual transfer — this app can't see the result automatically on iPhone, so confirm here to keep your weekly total accurate.
+        </p>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnMarkPaid">Yes, paid</button>
+          <button class="btn btn-ghost" id="btnMarkFailed">No / cancelled</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section id="view-history" class="view">
+      <h2 class="section-title">Spend by merchant</h2>
+      <div id="merchantList"><div class="empty-state">No payments yet.</div></div>
+
+      <div class="divider"></div>
+
+      <h2 class="section-title">Recent activity</h2>
+      <div id="txnList"><div class="empty-state">Nothing logged yet.</div></div>
+    </section>
+
+    <!-- SETTINGS VIEW -->
+    <section id="view-settings" class="view">
+      <h2 class="section-title">Weekly budget</h2>
+
+      <div class="field">
+        <label for="inputLimit">Weekly limit (₹)</label>
+        <input type="number" id="inputLimit" inputmode="numeric" min="0" step="50" />
+      </div>
+
+      <div class="field">
+        <label for="inputWeekStart">Week resets on</label>
+        <select id="inputWeekStart">
+          <option value="1">Monday</option>
+          <option value="0">Sunday</option>
+          <option value="6">Saturday</option>
+          <option value="5">Friday</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="btnSaveSettings">Save</button>
+
+      <div class="divider"></div>
+
+      <h2 class="section-title">Backup</h2>
+      <p class="about-note">Safari can clear stored data after a week of not opening this app. Export a backup now and then so you don't lose your history.</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btnExport">Export backup</button>
+        <button class="btn btn-ghost" id="btnImport">Import backup</button>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" hidden />
+
+      <div class="divider"></div>
+
+      <h2 class="section-title">About &amp; limits</h2>
+      <p class="about-note">
+        This app keeps its own budget counter on your phone — it's separate from your bank balance.
+        It cannot control whether BHIM (or any UPI app) uses UPI Lite or asks for a PIN; that's decided
+        inside that app, not by this one. It also can't stop you from opening BHIM directly and skipping
+        this gate entirely — it only works if scanning here is the habit you build. All data stays on
+        this device; nothing is sent anywhere.
+      </p>
+
+      <button class="btn btn-danger" id="btnResetData" style="margin-top:18px;">Erase all data</button>
+    </section>
+
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <nav class="tabbar">
+    <button data-view="scan" class="active"><span class="dot"></span>Scan</button>
+    <button data-view="history"><span class="dot"></span>History</button>
+    <button data-view="settings"><span class="dot"></span>Settings</button>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+  <script src="js/storage.js" defer></script>
+  <script src="js/upi.js" defer></script>
+  <script src="js/scanner.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
