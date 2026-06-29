@@ -358,6 +358,53 @@ $("btnResetData").addEventListener("click", () => {
   }
 });
 
+function showPaymentChooser(upiLink) {
+
+    const links = getPaymentLinks(upiLink);
+
+    const choice = prompt(
+`Choose Payment App
+
+1 - BHIM
+
+2 - Google Pay
+
+3 - PhonePe
+
+4 - Paytm
+
+5 - WhatsApp
+
+6 - Any UPI`
+    );
+
+    switch(choice){
+
+        case "1":
+            window.location.href = links.bhim;
+            break;
+
+        case "2":
+            window.location.href = links.gpay;
+            break;
+
+        case "3":
+            window.location.href = links.phonepe;
+            break;
+
+        case "4":
+            window.location.href = links.paytm;
+            break;
+
+        case "5":
+            window.location.href = links.whatsapp;
+            break;
+
+        default:
+            window.location.href = links.any;
+    }
+
+}
 // ---------------- Init ----------------
 
 if ("serviceWorker" in navigator) {
