@@ -1,10 +1,11 @@
 // js/paymentApps.js
 
-export function getPaymentLinks(upiLink) {
+function getPaymentLinks(upiLink) {
 
     const query = upiLink.replace("upi://pay?", "");
 
     return {
+
         bhim: "bhim://pay?" + query,
 
         gpay: "gpay://upi/pay?" + query,
@@ -16,14 +17,7 @@ export function getPaymentLinks(upiLink) {
         whatsapp: "whatsapp://pay?" + query,
 
         any: upiLink
+
     };
-}
 
-export function launchPayment(app, upiLink) {
-
-    const links = getPaymentLinks(upiLink);
-
-    const url = links[app] || links.any;
-
-    window.location.href = url;
 }
