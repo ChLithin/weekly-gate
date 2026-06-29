@@ -38,15 +38,16 @@ function decodeMerchantName(pn) {
 // js/upi.js
 function buildUpiLink({ rawParams, am }) {
 
-    // Copy every parameter from the original QR
     const params = new URLSearchParams(rawParams.toString());
 
-    // Update only the amount
     if (am && Number(am) > 0) {
         params.set("am", Number(am).toFixed(2));
     }
 
+    // Ensure currency is always present
+    if (!params.has("cu")) {
+        params.set("cu", "INR");
+    }
+
     return "upi://pay?" + params.toString();
-
 }
-
