@@ -170,10 +170,14 @@ $("btnCopyVpa").addEventListener("click", async () => {
 });
 
 $("btnPay").addEventListener("click", () => {
+
   if (!currentParsed) return;
-  const amount = currentParsed.am && Number(currentParsed.am) > 0
-    ? Number(currentParsed.am)
-    : Number($("amountInput").value) || 0;
+
+  const amount =
+    currentParsed.am && Number(currentParsed.am) > 0
+      ? Number(currentParsed.am)
+      : Number($("amountInput").value) || 0;
+
   if (amount <= 0 || amount > getRemaining()) return;
 
   const record = addTxn({
@@ -182,10 +186,12 @@ $("btnPay").addEventListener("click", () => {
     amount,
     status: "pending",
   });
+
   currentTxnId = record.id;
+
   renderGauge();
 
-  const link = buildUpiLink({
+  const upiLink = buildUpiLink({
     pa: currentParsed.pa,
     pn: currentParsed.pn,
     am: String(amount),
@@ -196,9 +202,8 @@ $("btnPay").addEventListener("click", () => {
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
 
-  // Hand off to the UPI app. If nothing claims this scheme, the page just stays put
-  // and the person can still use the "Copy UPI ID" fallback they already saw.
-  window.location.href = link;
+  showPaymentChooser(upiLink);
+
 });
 
 $("btnMarkPaid").addEventListener("click", () => {
