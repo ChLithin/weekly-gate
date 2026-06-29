@@ -198,8 +198,6 @@ $("btnPay").addEventListener("click", () => {
   am: String(amount),
 });
 
-console.log("Generated UPI Link:", link);
-alert(link);
   
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
@@ -367,17 +365,11 @@ function showPaymentChooser(upiLink) {
     const choice = prompt(
 `Choose Payment App
 
-1 - BHIM
+1 - 🇮🇳 BHIM
 
-2 - Google Pay
+2 - 🟣 PhonePe
 
-3 - PhonePe
-
-4 - Paytm
-
-5 - WhatsApp
-
-6 - Any UPI`
+3 - Any UPI App`
     );
 
     switch(choice){
@@ -387,25 +379,13 @@ function showPaymentChooser(upiLink) {
             break;
 
         case "2":
-            window.location.href = links.gpay;
-            break;
-
-        case "3":
             window.location.href = links.phonepe;
-            break;
-
-        case "4":
-            window.location.href = links.paytm;
-            break;
-
-        case "5":
-            window.location.href = links.whatsapp;
             break;
 
         default:
             window.location.href = links.any;
+            break;
     }
-
 }
 // ---------------- Init ----------------
 
