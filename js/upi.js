@@ -34,23 +34,17 @@ function decodeMerchantName(pn) {
 // upi.js — Fixed deep-linking format targeting BHIM safely
 
 // js/upi.js
-
 function buildUpiLink({ rawParams, am }) {
-  const params = new URLSearchParams();
-  
-  // 1. Mandatory Parameters (Must use standard 'upi' scheme so BHIM reads it perfectly)
-  if (pa) params.set("pa", pa.trim());
-  if (pn) params.set("pn", pn.trim());
-  
-  // 2. Format amount to strict decimal values (e.g. 10.00) to keep BHIM happy
-  if (am && parseFloat(am) > 0) {
-    params.set("am", parseFloat(am).toFixed(2));
-  }
-  
-  params.set("cu", cu || "INR");
-  if (tr) params.set("tr", tr.trim());
 
-  // Return the official standard string format
-  return "upi://pay?" + params.toString();
+    // Copy every parameter from the original QR
+    const params = new URLSearchParams(rawParams.toString());
+
+    // Update only the amount
+    if (am && Number(am) > 0) {
+        params.set("am", Number(am).toFixed(2));
+    }
+
+    return "upi://pay?" + params.toString();
+
 }
 
