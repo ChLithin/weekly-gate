@@ -1,4 +1,6 @@
 // app.js — wires the UI to storage.js / upi.js / scanner.js.
+// paymentApps.js is loaded in index.html
+// No import needed if you are not using ES modules
 
 let currentParsed = null;
 let currentTxnId = null;
