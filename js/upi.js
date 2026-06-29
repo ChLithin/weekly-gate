@@ -32,34 +32,24 @@ function decodeMerchantName(pn) {
 // Builds a fresh UPI deep link from the parsed fields + a possibly user-edited amount.
 // upi.js — Fixed deep-linking format targeting BHIM safely
 
+// js/upi.js
+
 function buildUpiLink({ pa, pn, am, tr, cu }) {
   const params = new URLSearchParams();
   
-  // 1. CRITICAL: Only append parameters if they actually contain data. 
-  // BHIM errors out if it encounters empty fields like &tr=&mc=
-  if (pa && pa.trim() !== "") {
-    params.set("pa", pa.trim());
-  }
+  // 1. Mandatory Parameters (Must use standard 'upi' scheme so BHIM reads it perfectly)
+  if (pa) params.set("pa", pa.trim());
+  if (pn) params.set("pn", pn.trim());
   
-  if (pn && pn.trim() !== "") {
-    // BHIM requires clean spaces rather than technical encoded sets like '+'
-    params.set("pn", pn.trim()); 
-  }
-  
-  if (am && am !== "" && parseFloat(am) > 0) {
-    // Force format values strictly to 2 decimal places (e.g. 10.00 instead of 10)
+  // 2. Format amount to strict decimal values (e.g. 10.00) to keep BHIM happy
+  if (am && parseFloat(am) > 0) {
     params.set("am", parseFloat(am).toFixed(2));
   }
   
-  // Default fallback asset string parameters mapping
   params.set("cu", cu || "INR");
+  if (tr) params.set("tr", tr.trim());
 
-  // Only include transactional reference tracking keys if they are valid merchant nodes
-  if (tr && tr.trim() !== "") {
-    params.set("tr", tr.trim());
-  }
-
-  // Enforce the direct BHIM target router path clean string
-  return "bhim://pay?" + params.toString();
+  // Return the official standard string format
+  return "upi://pay?" + params.toString();
 }
 
