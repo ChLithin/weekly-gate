@@ -196,7 +196,11 @@ $("btnPay").addEventListener("click", () => {
   const link = buildUpiLink({
   rawParams: currentParsed.rawParams,
   am: String(amount),
-  });
+});
+
+console.log("Generated UPI Link:", link);
+alert(link);
+  
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
 
