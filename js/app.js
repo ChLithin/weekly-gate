@@ -193,14 +193,10 @@ $("btnPay").addEventListener("click", () => {
 
   renderGauge();
 
-  const upiLink = buildUpiLink({
-    pa: currentParsed.pa,
-    pn: currentParsed.pn,
-    am: String(amount),
-    tr: currentParsed.tr,
-    cu: currentParsed.cu,
+  const link = buildUpiLink({
+  rawParams: currentParsed.rawParams,
+  am: String(amount),
   });
-
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
 
