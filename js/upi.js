@@ -37,5 +37,5 @@ function buildUpiLink({ pa, pn, am, tr, cu }) {
   if (am) params.set("am", am);
   params.set("cu", cu || "INR");
   if (tr) params.set("tr", tr);
-  return "upi://pay?" + params.toString();
+  return "bhim://pay?" + params.toString();
 }
