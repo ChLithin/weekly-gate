@@ -18,6 +18,7 @@ function parseUpiString(raw) {
     tr: params.get("tr") || "",
     mc: params.get("mc") || "",
     cu: params.get("cu") || "INR",
+    rawParams: params
   };
 }
 
