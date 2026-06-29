@@ -14,7 +14,7 @@ function parseUpiString(raw) {
   return {
     pa: params.get("pa") || "",
     pn: decodeMerchantName(params.get("pn") || ""),
-    am: params.get("am") || "",
+    am: params.get("am") || "",z
     tr: params.get("tr") || "",
     mc: params.get("mc") || "",
     cu: params.get("cu") || "INR",
@@ -35,7 +35,7 @@ function decodeMerchantName(pn) {
 
 // js/upi.js
 
-function buildUpiLink({ pa, pn, am, tr, cu }) {
+function buildUpiLink({ rawParams, am }) {
   const params = new URLSearchParams();
   
   // 1. Mandatory Parameters (Must use standard 'upi' scheme so BHIM reads it perfectly)
