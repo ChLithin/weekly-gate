@@ -9,12 +9,14 @@ function isUpiString(raw) {
 // Parses a "upi://pay?pa=...&pn=...&am=...&tr=...&mc=...&cu=INR" string.
 function parseUpiString(raw) {
   if (!isUpiString(raw)) return null;
+
   const queryString = raw.split("?")[1] || "";
   const params = new URLSearchParams(queryString);
+
   return {
     pa: params.get("pa") || "",
     pn: decodeMerchantName(params.get("pn") || ""),
-    am: params.get("am") || "",z
+    am: params.get("am") || "",
     tr: params.get("tr") || "",
     mc: params.get("mc") || "",
     cu: params.get("cu") || "INR",
