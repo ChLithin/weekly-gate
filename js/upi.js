@@ -59,15 +59,28 @@ const APP_SCHEME_PREFIX = {
   paytm: "paytm://pay?",
 };
 
+// `tr` (transaction reference) is spec'd as mandatory for merchant payments
+// AND for dynamic URL generation — which is exactly what we're doing every
+// time we rebuild a link from a scanned QR. A static personal QR (paying an
+// individual, not a merchant) often has no `tr` baked in at all, since there's
+// no merchant-side system to issue one. Missing `tr` is a plausible reason a
+// receiving app's stricter post-2026 validation silently rejects the request
+// before ever reaching the PIN step. We generate one ourselves whenever the
+// scanned QR didn't already supply it, rather than leaving it blank.
+function generateTr() {
+  return "WG" + Date.now().toString(36).toUpperCase();
+}
+
 // Rebuilds the link from the QR's original params (preserving their exact
-// encoding), only overriding the amount if the person typed one in, and
-// making sure `cu` is present. Then swaps in the target app's own scheme.
+// encoding), only overriding the amount if the person typed one in, ensuring
+// `cu` and `tr` are both present, then swaps in the target app's own scheme.
 function buildAppLink(appKey, rawParams, amount) {
   const params = new URLSearchParams(rawParams.toString());
   if (amount && Number(amount) > 0) {
     params.set("am", String(amount));
   }
   if (!params.has("cu")) params.set("cu", "INR");
+  if (!params.get("tr")) params.set("tr", generateTr());
 
   const prefix = APP_SCHEME_PREFIX[appKey] || APP_SCHEME_PREFIX.default;
   return prefix + params.toString();
