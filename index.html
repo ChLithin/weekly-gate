@@ -3,28 +3,39 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<meta name="theme-color" content="#12141C" />
+<meta name="theme-color" content="#F1EAD9" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Weekly Gate</title>
+<title>Weekly Ledger</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-  <header class="gauge">
-    <div class="gauge-row">
-      <span class="gauge-eyebrow">This week</span>
-      <span class="gauge-reset" id="gaugeReset">resets in 7 days</span>
+  <header class="ledger-head">
+    <div class="ledger-head-top">
+      <span class="wordmark">Weekly Ledger</span>
+      <span class="ledger-date" id="gaugeReset">resets in 7 days</span>
     </div>
-    <div class="gauge-amount-row">
-      <span class="gauge-amount" id="gaugeAmount">₹1,000</span>
-      <span class="gauge-of" id="gaugeOf">left of ₹1,000</span>
+
+    <div class="stamp-wrap">
+      <svg class="stamp" viewBox="0 0 160 160" aria-hidden="true">
+        <circle cx="80" cy="80" r="68" class="stamp-ring-outer" />
+        <circle cx="80" cy="80" r="56" class="stamp-ring-inner" />
+        <text x="80" y="75" text-anchor="middle" class="stamp-amount" id="stampAmount">₹1,000</text>
+        <text x="80" y="96" text-anchor="middle" class="stamp-label">LEFT THIS WEEK</text>
+      </svg>
+      <svg class="stamp-over" viewBox="0 0 168 90" id="stampOver" hidden aria-hidden="true">
+        <rect x="4" y="4" width="160" height="82" class="stamp-over-rect" />
+        <text x="84" y="55" text-anchor="middle" class="stamp-over-text">OVER LIMIT</text>
+      </svg>
     </div>
-    <div class="gauge-track">
-      <div class="gauge-fill" id="gaugeFill" style="width: 0%"></div>
+
+    <div class="ledger-track">
+      <div class="ledger-track-fill" id="gaugeFill" style="width: 0%"></div>
     </div>
+    <div class="ledger-of" id="gaugeOf">of ₹1,000 weekly limit</div>
   </header>
 
   <main>
@@ -34,7 +45,7 @@
 
       <div id="scanIdle" class="scan-stage">
         <div class="scan-placeholder">
-          <p>Point your camera at any UPI QR code. We'll check this week's budget before handing off to your UPI app.</p>
+          <p>Point your camera at any UPI QR code. We'll check this week's ledger before you settle the payment.</p>
           <button class="btn btn-primary" id="btnStartScan">Scan a QR code</button>
         </div>
       </div>
@@ -47,29 +58,50 @@
       <button class="btn btn-ghost" id="btnCancelScan" hidden style="margin-top:10px;">Cancel</button>
 
       <div id="scanConfirm" class="confirm-card" hidden style="margin-top:16px;">
-        <span class="status-pill" id="confirmPill">Within budget</span>
+        <div class="ledger-field-label">Particulars</div>
         <div class="confirm-merchant" id="confirmMerchant">Merchant</div>
         <div class="confirm-vpa" id="confirmVpa">vpa@bank</div>
 
+        <div class="ledger-field-label">Amount</div>
         <input type="number" inputmode="decimal" class="amount-input" id="amountInput" placeholder="Enter amount" hidden />
         <div class="confirm-amount" id="confirmAmount" hidden>₹0</div>
 
+        <span class="status-pill" id="confirmPill">Within budget</span>
         <div id="confirmRemainingNote" class="fallback-note" style="display:none;"></div>
 
-        <button class="btn btn-primary" id="btnPay">Pay via UPI app</button>
-        <button class="btn btn-ghost" id="btnRescan" style="margin-top:10px;">Scan something else</button>
+        <div class="settle-label">Settle via</div>
+        <div class="settle-via">
+          <button class="btn btn-primary pay-app-btn" data-app="phonepe">
+            <span class="pay-app-name">PhonePe</span><span class="pay-app-hint">phonepe://</span>
+          </button>
+          <button class="btn btn-ghost pay-app-btn" data-app="default">
+            <span class="pay-app-name">Default UPI app</span><span class="pay-app-hint">upi://</span>
+          </button>
+          <button class="btn btn-ghost pay-app-btn" data-app="gpay">
+            <span class="pay-app-name">Google Pay</span><span class="pay-app-hint">gpay://</span>
+          </button>
+          <button class="btn btn-ghost pay-app-btn" data-app="paytm">
+            <span class="pay-app-name">Paytm</span><span class="pay-app-hint">paytm://</span>
+          </button>
+        </div>
+
+        <button class="btn btn-ghost" id="btnRescan" style="margin-top:12px;">Scan something else</button>
 
         <div class="fallback-note">
-          Tapping Pay opens your UPI app (BHIM, GPay, etc.) with the amount pre-filled — approve it there as usual, PIN or UPI Lite, whichever that app uses.
-          If nothing opens, copy the details and pay manually:
+          PhonePe is confirmed working on your phone. BHIM doesn't get its own button — its link scheme
+          has failed four different ways across testing. "Default UPI app" currently hands off to
+          WhatsApp on your phone, not BHIM, since WhatsApp is claiming that shared link first. If you
+          need BHIM specifically, copy the details and pay there manually:
           <button id="btnCopyVpa">Copy UPI ID</button>
         </div>
       </div>
 
       <div id="scanFollowup" class="confirm-card" hidden style="margin-top:16px;">
-        <div class="confirm-merchant">Did the payment go through?</div>
-        <p style="color:var(--text-dim); font-size:13px; margin:8px 0 16px;">
-          Your UPI app handles the actual transfer — this app can't see the result automatically on iPhone, so confirm here to keep your weekly total accurate.
+        <div class="ledger-field-label">Confirm entry</div>
+        <div class="confirm-merchant" style="margin-bottom:6px;">Did the payment go through?</div>
+        <p style="color:var(--ink-dim); font-size:13px; margin:0 0 16px; line-height:1.55;">
+          Your UPI app handles the actual transfer — this app can't see the result automatically on
+          iPhone, so confirm here to keep the ledger accurate.
         </p>
         <div class="btn-row">
           <button class="btn btn-primary" id="btnMarkPaid">Yes, paid</button>
@@ -86,7 +118,7 @@
 
       <div class="divider"></div>
 
-      <h2 class="section-title">Recent activity</h2>
+      <h2 class="section-title">Recent entries</h2>
       <div id="txnList"><div class="empty-state">Nothing logged yet.</div></div>
     </section>
 
@@ -114,7 +146,7 @@
       <div class="divider"></div>
 
       <h2 class="section-title">Backup</h2>
-      <p class="about-note">Safari can clear stored data after a week of not opening this app. Export a backup now and then so you don't lose your history.</p>
+      <p class="about-note">Safari can clear stored data after a week of not opening this app. Export a backup now and then so you don't lose your ledger.</p>
       <div class="btn-row">
         <button class="btn btn-ghost" id="btnExport">Export backup</button>
         <button class="btn btn-ghost" id="btnImport">Import backup</button>
@@ -125,11 +157,12 @@
 
       <h2 class="section-title">About &amp; limits</h2>
       <p class="about-note">
-        This app keeps its own budget counter on your phone — it's separate from your bank balance.
-        It cannot control whether BHIM (or any UPI app) uses UPI Lite or asks for a PIN; that's decided
-        inside that app, not by this one. It also can't stop you from opening BHIM directly and skipping
-        this gate entirely — it only works if scanning here is the habit you build. All data stays on
-        this device; nothing is sent anywhere.
+        This app keeps its own ledger on your phone — separate from your bank balance. It cannot control
+        whether BHIM or any other app uses UPI Lite or asks for a PIN; that's decided inside that app, not
+        this one. On iPhone, several UPI apps can register the same generic payment link, so "Default UPI
+        app" may open something other than BHIM — use the named app buttons, or settle manually, when that
+        matters. It also can't stop you from opening an app directly and skipping this gate — it only works
+        if scanning here is the habit you build. All data stays on this device.
       </p>
 
       <button class="btn btn-danger" id="btnResetData" style="margin-top:18px;">Erase all data</button>
@@ -140,16 +173,15 @@
   <div class="toast" id="toast"></div>
 
   <nav class="tabbar">
-    <button data-view="scan" class="active"><span class="dot"></span>Scan</button>
-    <button data-view="history"><span class="dot"></span>History</button>
-    <button data-view="settings"><span class="dot"></span>Settings</button>
+    <button data-view="scan" class="active">Scan</button>
+    <button data-view="history">History</button>
+    <button data-view="settings">Settings</button>
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
   <script src="js/storage.js" defer></script>
   <script src="js/upi.js" defer></script>
   <script src="js/scanner.js" defer></script>
-  <script src="js/paymentApps.js"></script>
   <script src="js/app.js" defer></script>
 </body>
 </html>

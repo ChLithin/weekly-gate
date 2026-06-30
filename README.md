@@ -14,18 +14,35 @@ Apple Developer account needed.
   That decision is made entirely inside BHIM (or GPay/PhonePe/whatever you
   pick), based on NPCI's rules — no outside app gets a say in it. Approving
   the payment in your UPI app works exactly as it does today.
+- **BHIM doesn't get a "settle via" button.** Across testing we tried
+  `bhim://pay`, `bhim://upi/pay`, with the VPA both encoded and raw — four
+  attempts, multiple different undocumented errors. That pattern points to
+  BHIM's iOS app not supporting arbitrary third-party-initiated payments
+  through its own link scheme at all, rather than a fixable encoding issue.
+  **PhonePe's own scheme is confirmed working** on a real device with this
+  app, so it's the lead button. The app also offers the standardised
+  "Default UPI app" link and Google Pay / Paytm buttons (those two are best
+  guesses, not yet confirmed on a device — test and let me know if either
+  opens the wrong thing).
 - **It cannot read your bank balance or your UPI Lite balance.** The budget
   here is a separate counter this app keeps for itself, based only on
   payments you make *through* it.
-- **It cannot stop you from opening BHIM directly and scanning there**,
-  bypassing the gate entirely. iOS doesn't let any app monitor or block
-  another app. This only works if scanning here becomes your habit — it's a
-  speed bump you put in your own way, not a lock.
+- **On iPhone, several apps can claim the same generic `upi://` link.** If
+  you have more than one UPI app installed, tapping "Default UPI app" may
+  open a different one than you expect — iOS doesn't show a chooser the way
+  Android does, and there's no setting to control which app wins. Use the
+  named buttons (PhonePe, Google Pay, Paytm) when you want to be sure which
+  app opens; for BHIM, the manual "Copy UPI ID" fallback is the dependable
+  route for now.
+- **It cannot stop you from opening any UPI app directly and skipping the
+  gate.** iOS doesn't let any app monitor or block another. This only works
+  if scanning here becomes your habit — it's a speed bump you put in your
+  own way, not a lock.
 - **It can't always confirm a payment went through automatically.** Unlike
   Android, iOS doesn't reliably hand back a "payment succeeded" result to the
-  app that opened BHIM. So after you tap Pay, the app asks you a one-tap
-  "did it go through?" question to keep your weekly total accurate. Be honest
-  with it — that's the whole system.
+  app that opened the UPI app. So after you tap Pay, the app asks you a
+  one-tap "did it go through?" question to keep your weekly total accurate.
+  Be honest with it — that's the whole system.
 - **Everything stays on your phone.** No server, no account, no analytics.
   Export a backup occasionally (see below) since Safari can clear stored
   data on PWAs you haven't opened in a week or so.

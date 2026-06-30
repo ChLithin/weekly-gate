@@ -1,6 +1,4 @@
 // app.js — wires the UI to storage.js / upi.js / scanner.js.
-// paymentApps.js is loaded in index.html
-// No import needed if you are not using ES modules
 
 let currentParsed = null;
 let currentTxnId = null;
@@ -19,7 +17,7 @@ function showToast(msg) {
   t._hideTimer = setTimeout(() => t.classList.remove("show"), 2200);
 }
 
-// ---------------- Gauge ----------------
+// ---------------- Stamp header ----------------
 
 function renderGauge() {
   const cfg = getConfig();
@@ -28,11 +26,12 @@ function renderGauge() {
   const over = spent > cfg.weeklyLimit;
   const pct = cfg.weeklyLimit > 0 ? Math.min(100, (spent / cfg.weeklyLimit) * 100) : 0;
 
-  $("gaugeAmount").textContent = formatRupee(remaining);
-  $("gaugeAmount").classList.toggle("over", over);
-  $("gaugeOf").textContent = `left of ${formatRupee(cfg.weeklyLimit)}`;
+  $("stampAmount").textContent = formatRupee(remaining);
+  $("stampAmount").classList.toggle("over", over);
+  $("gaugeOf").textContent = `of ${formatRupee(cfg.weeklyLimit)} weekly limit`;
   $("gaugeFill").style.width = pct + "%";
   $("gaugeFill").classList.toggle("over", over);
+  $("stampOver").hidden = !over;
 
   const days = daysUntilReset();
   $("gaugeReset").textContent = days <= 0 ? "resets today" : `resets in ${days} day${days === 1 ? "" : "s"}`;
@@ -124,13 +123,23 @@ $("amountInput").addEventListener("input", () => {
 
 function updatePayState(amount) {
   const remaining = getRemaining();
-  const payBtn = $("btnPay");
+  const payButtons = document.querySelectorAll(".pay-app-btn");
   const pill = $("confirmPill");
   const note = $("confirmRemainingNote");
 
+  const setButtons = (enabled, primaryFirst) => {
+    payButtons.forEach((btn, i) => {
+      btn.disabled = !enabled;
+      btn.className = !enabled
+        ? "btn btn-block-disabled pay-app-btn"
+        : i === 0 && primaryFirst
+        ? "btn btn-primary pay-app-btn"
+        : "btn btn-ghost pay-app-btn";
+    });
+  };
+
   if (amount <= 0) {
-    payBtn.disabled = true;
-    payBtn.className = "btn btn-block-disabled";
+    setButtons(false);
     pill.className = "status-pill";
     pill.textContent = "Enter an amount";
     note.style.display = "none";
@@ -138,14 +147,12 @@ function updatePayState(amount) {
   }
 
   if (amount <= remaining) {
-    payBtn.disabled = false;
-    payBtn.className = "btn btn-primary";
+    setButtons(true, true);
     pill.className = "status-pill ok";
     pill.textContent = "Within budget";
     note.style.display = "none";
   } else {
-    payBtn.disabled = true;
-    payBtn.className = "btn btn-block-disabled";
+    setButtons(false);
     pill.className = "status-pill blocked";
     pill.textContent = "Over weekly limit";
     const days = daysUntilReset();
@@ -171,15 +178,15 @@ $("btnCopyVpa").addEventListener("click", async () => {
   }
 });
 
-$("btnPay").addEventListener("click", () => {
+document.querySelectorAll(".pay-app-btn").forEach((btn) => {
+  btn.addEventListener("click", () => payWith(btn.dataset.app));
+});
 
+function payWith(appKey) {
   if (!currentParsed) return;
-
-  const amount =
-    currentParsed.am && Number(currentParsed.am) > 0
-      ? Number(currentParsed.am)
-      : Number($("amountInput").value) || 0;
-
+  const amount = currentParsed.am && Number(currentParsed.am) > 0
+    ? Number(currentParsed.am)
+    : Number($("amountInput").value) || 0;
   if (amount <= 0 || amount > getRemaining()) return;
 
   const record = addTxn({
@@ -188,27 +195,32 @@ $("btnPay").addEventListener("click", () => {
     amount,
     status: "pending",
   });
-
   currentTxnId = record.id;
-
   renderGauge();
 
-  const link = buildUpiLink({
-  rawParams: currentParsed.rawParams,
-  am: String(amount),
-});
+  const link = buildAppLink(appKey, currentParsed.rawParams, amount);
 
-  
   $("scanConfirm").hidden = true;
   $("scanFollowup").hidden = false;
 
-  showPaymentChooser(link);
+  // Hand off to the UPI app. window.location.href is sometimes unreliable for
+  // custom-scheme navigation on iOS (especially from a home-screen "standalone"
+  // PWA) — a programmatically clicked link tends to be handled more consistently.
+  triggerAppLink(link);
+}
 
-});
+function triggerAppLink(link) {
+  const a = document.createElement("a");
+  a.href = link;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 200);
+}
 
 $("btnMarkPaid").addEventListener("click", () => {
   if (currentTxnId) updateTxnStatus(currentTxnId, "paid");
-  finishFollowup("Logged to this week's spend");
+  finishFollowup("Logged to this week's ledger");
 });
 
 $("btnMarkFailed").addEventListener("click", () => {
@@ -224,7 +236,7 @@ function finishFollowup(message) {
 }
 
 // On load, if there's a very recent pending payment (e.g. the app reloaded after
-// switching to BHIM), resume the follow-up question instead of losing it.
+// switching to a UPI app), resume the follow-up question instead of losing it.
 function resumePendingIfAny() {
   const txns = getTxns();
   const recentPending = txns.find(
@@ -317,7 +329,7 @@ $("btnExport").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `weekly-gate-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `weekly-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -358,35 +370,6 @@ $("btnResetData").addEventListener("click", () => {
   }
 });
 
-function showPaymentChooser(upiLink) {
-
-    const links = getPaymentLinks(upiLink);
-
-    const choice = prompt(
-`Choose Payment App
-
-1 - 🇮🇳 BHIM
-
-2 - 🟣 PhonePe
-
-3 - Any UPI App`
-    );
-
-    switch(choice){
-
-        case "1":
-            window.location.href = links.bhim;
-            break;
-
-        case "2":
-            window.location.href = links.phonepe;
-            break;
-
-        default:
-            window.location.href = links.any;
-            break;
-    }
-}
 // ---------------- Init ----------------
 
 if ("serviceWorker" in navigator) {
