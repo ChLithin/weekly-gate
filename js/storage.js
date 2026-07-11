@@ -20,6 +20,7 @@ function addTxn(txn) {
   const record = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
     contactName: txn.contactName || "Unknown", contactId: txn.contactId || null,
     amount: Number(txn.amount) || 0, status: txn.status || "pending",
+    isEssential: txn.isEssential || false,
     date: txn.date || new Date().toISOString() };
   txns.unshift(record); setTxns(txns);
   if (record.contactId && record.status === "paid") updateContactStats(record.contactId, record.amount);
@@ -45,7 +46,7 @@ function getSpentThisWeek() {
   // confirm or cancel. Stale pendings are auto-cancelled on app load.
   const cfg = getConfig(); const now = new Date();
   const start = getWeekStart(now, cfg.weekStartDay); const end = getWeekEnd(start);
-  return getTxns().filter(t => (t.status==="paid" || t.status==="pending") && new Date(t.date)>=start && new Date(t.date)<end)
+  return getTxns().filter(t => (t.status==="paid" || t.status==="pending") && !t.isEssential && new Date(t.date)>=start && new Date(t.date)<end)
     .reduce((s,t) => s + t.amount, 0);
 }
 
@@ -120,6 +121,29 @@ function searchContacts(query) {
 
 // Analytics
 function getRecentTxns(n = 20) { return getTxns().slice(0, n); }
+
+// Essentials analytics — monthly breakdown, not counted in weekly budget
+function getEssentialStats(monthsBack = 3) {
+  const txns = getTxns().filter(t => t.isEssential && t.status === "paid");
+  const months = [];
+  const now = new Date();
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const mt = txns.filter(t => { const d = new Date(t.date); return d >= start && d < end; });
+    months.push({
+      label: start.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
+      spent: mt.reduce((s, t) => s + t.amount, 0),
+      count: mt.length
+    });
+  }
+  // by item name (contactName is used as item name for essentials)
+  const byItem = {};
+  txns.forEach(t => { byItem[t.contactName] = (byItem[t.contactName] || 0) + t.amount; });
+  const items = Object.entries(byItem).map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount).slice(0, 10);
+  return { months, items };
+}
 
 // Backup
 function exportData() { return JSON.stringify({ config: getConfig(), txns: getTxns(), contacts: getContacts(), exportedAt: new Date().toISOString() }, null, 2); }

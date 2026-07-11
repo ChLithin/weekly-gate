@@ -110,6 +110,30 @@
 
       <div class="group-label">Recent</div>
       <div class="inset-card" style="margin-top:0" id="txnList"><div class="empty-state">Nothing yet.</div></div>
+
+      <!-- ESSENTIALS SECTION -->
+      <div class="group-head" style="margin-top:28px;">
+        <span class="group-label">Essentials</span>
+        <span class="group-label-note">not from budget</span>
+      </div>
+      <div class="stat-cards" style="margin-top:0">
+        <div class="stat-card">
+          <div class="stat-card-label">This month</div>
+          <div class="stat-card-value" id="essMonthSpent">₹0</div>
+          <div class="stat-card-sub" id="essMonthCount"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">3-month avg</div>
+          <div class="stat-card-value accent" id="essAvg">₹0</div>
+          <div class="stat-card-sub">per month</div>
+        </div>
+      </div>
+      <div class="inset-card"><div class="card-pad">
+        <div class="card-title">Monthly essentials spend</div>
+        <div class="day-bars" id="essMonthBars"></div>
+      </div></div>
+      <div class="group-label">By item</div>
+      <div class="inset-card" style="margin-top:0" id="essItemList"><div class="empty-state">No essentials tracked yet.</div></div>
     </section>
 
     <!-- SETTINGS -->
@@ -163,11 +187,23 @@
       </div>
     </div>
 
-    <div class="contact-label">Paying who?</div>
+    <div class="contact-label" id="contactLabel">Paying who?</div>
     <div class="contact-input-wrap">
       <input class="contact-input" id="contactInput" type="text" placeholder="Name or search saved…" autocomplete="off"/>
       <div class="contact-dropdown" id="contactDropdown" hidden></div>
     </div>
+
+    <!-- Essential toggle -->
+    <label class="essential-toggle" id="essentialToggleRow">
+      <div class="essential-toggle-text">
+        <span class="essential-toggle-title">Essential expense</span>
+        <span class="essential-toggle-sub">Laundry, facewash, groceries… won't count against budget</span>
+      </div>
+      <div class="toggle-switch">
+        <input type="checkbox" id="essentialCheck"/>
+        <span class="toggle-thumb"></span>
+      </div>
+    </label>
 
     <div class="budget-status" id="budgetStatus" hidden></div>
     <button class="sheet-btn sheet-btn-primary" id="btnConfirmPay" disabled>Continue</button>

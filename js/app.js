@@ -141,6 +141,9 @@ function openSheet() {
   $("contactInput").value = "";
   $("budgetStatus").hidden = true;
   $("btnConfirmPay").disabled = true;
+  $("essentialCheck").checked = false;
+  $("contactLabel").textContent = "Paying who?";
+  $("contactInput").placeholder = "Name or search saved\u2026";
   currentTxn = null;
   currentContact = null;
   saveContactPending = null;
@@ -190,14 +193,25 @@ function fitAmount() {
 }
 
 // ── Budget check ──
+function isEssential() { return $("essentialCheck").checked; }
+
 function checkBudget() {
   const amount = Number($("amountField").value) || 0;
   const contact = $("contactInput").value.trim();
-  const remaining = getRemaining();
   const st = $("budgetStatus");
 
   if (amount <= 0 || !contact) { st.hidden = true; $("btnConfirmPay").disabled = true; return; }
 
+  // Essentials bypass the weekly budget entirely
+  if (isEssential()) {
+    st.hidden = false;
+    st.className = "budget-status ok";
+    st.textContent = "✓ Essential — won't count against your weekly budget";
+    $("btnConfirmPay").disabled = false;
+    return;
+  }
+
+  const remaining = getRemaining();
   st.hidden = false;
   if (amount <= remaining * 0.5) {
     st.className = "budget-status ok";
@@ -212,6 +226,14 @@ function checkBudget() {
   }
   $("btnConfirmPay").disabled = false;
 }
+
+// Toggle essential: update label + recheck budget
+$("essentialCheck").addEventListener("change", () => {
+  const ess = isEssential();
+  $("contactLabel").textContent = ess ? "What is it?" : "Paying who?";
+  $("contactInput").placeholder = ess ? "e.g. Laundry, Facewash…" : "Name or search saved\u2026";
+  checkBudget();
+});
 
 $("amountField").addEventListener("input", () => { fitAmount(); checkBudget(); });
 $("contactInput").addEventListener("input", () => { checkBudget(); renderContactDropdown(); });
@@ -258,7 +280,8 @@ document.addEventListener("click", e => {
 $("btnConfirmPay").addEventListener("click", () => {
   const amount = Number($("amountField").value) || 0;
   const contactName = $("contactInput").value.trim();
-  if (amount <= 0 || !contactName || amount > getRemaining()) return;
+  const essential = isEssential();
+  if (amount <= 0 || !contactName || (!essential && amount > getRemaining())) return;
 
   if (saveContactPending && !currentContact) currentContact = saveContact(saveContactPending);
   else if (!currentContact && contactName) {
@@ -266,8 +289,9 @@ $("btnConfirmPay").addEventListener("click", () => {
     if (existing) currentContact = existing;
   }
 
-  // Pending txns count against the budget → the hold is real.
-  currentTxn = addTxn({ contactName, contactId: currentContact?.id || null, amount, status: "pending" });
+  // Essentials are logged as pending but excluded from budget math (isEssential flag).
+  // Regular txns count against budget as a hold until confirmed or cancelled.
+  currentTxn = addTxn({ contactName, contactId: currentContact?.id || null, amount, status: "pending", isEssential: essential });
   renderGauge();
   showWaiting(currentTxn);
 });
@@ -384,6 +408,47 @@ function renderAnalytics() {
   renderTrend(cfg);
   renderPayees(all, weekStart, now);
   renderRecent();
+  renderEssentials();
+}
+
+// ── Essentials analytics ──
+function renderEssentials() {
+  const { months, items } = getEssentialStats(3);
+  const now = new Date();
+  const thisMonth = months[months.length - 1];
+  const allSpent = months.reduce((s, m) => s + m.spent, 0);
+  const avg = Math.round(allSpent / months.length);
+
+  $("essMonthSpent").textContent = fmt(thisMonth.spent);
+  $("essMonthCount").textContent = thisMonth.count ? `${thisMonth.count} item${thisMonth.count !== 1 ? "s" : ""}` : "nothing this month";
+  $("essAvg").textContent = fmt(avg);
+
+  // Monthly bar chart (reuses day-bars style)
+  const max = Math.max(...months.map(m => m.spent), 1);
+  $("essMonthBars").innerHTML = months.map(m => {
+    const h = Math.max(3, (m.spent / max) * 100);
+    return `<div class="day-bar-wrap">
+      <div class="day-val">${m.spent > 0 ? "₹" + fmtShort(m.spent) : ""}</div>
+      <div class="day-bar-track"><div class="day-bar-fill" style="height:${m.spent > 0 ? h : 0}%"></div></div>
+      <div class="day-label">${m.label}</div>
+    </div>`;
+  }).join("");
+
+  // By item list
+  if (items.length === 0) {
+    $("essItemList").innerHTML = '<div class="empty-state">No essentials tracked yet.</div>';
+    return;
+  }
+  const maxAmt = items[0].amount;
+  $("essItemList").innerHTML = `<div class="card-pad">` + items.map(it => `
+    <div class="payee-row">
+      <div class="payee-top">
+        <div class="payee-avatar" style="background:${avatarColor(it.name)}">${escHtml(it.name[0].toUpperCase())}</div>
+        <div class="payee-name">${escHtml(it.name)}</div>
+        <div class="payee-amount">${fmt(it.amount)}</div>
+      </div>
+      <div class="payee-bar-track"><div class="payee-bar-fill" style="width:${Math.max(3, it.amount / maxAmt * 100)}%"></div></div>
+    </div>`).join("") + `</div>`;
 }
 
 // ── Spend per day (current week) ──
