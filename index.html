@@ -21,80 +21,34 @@
 <main>
   <!-- HOME VIEW -->
   <section id="view-home" class="view active">
+    <div class="gauge-screen">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 220 220">
+          <circle class="gauge-track" cx="110" cy="110" r="90"
+            stroke-dasharray="565" stroke-dashoffset="0"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="110" cy="110" r="90"
+            stroke-dasharray="565" stroke-dashoffset="565" stroke="var(--accent)"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-label">Left this week</div>
+          <div class="gauge-amount" id="gaugeAmount">₹0</div>
+          <div class="gauge-of" id="gaugeOf">of ₹0</div>
+          <div class="gauge-pct" id="gaugePct">0% used</div>
+        </div>
+      </div>
 
-<div class="hero-card">
+      <button class="pay-btn" id="btnPay">Pay →</button>
 
-    <div class="hero-top">
-        <span class="hero-title">
-            Weekly Budget
-        </span>
-
-        <span class="hero-reset" id="wbReset">
-            resets Monday
-        </span>
+      <div class="week-bar" style="margin-top:20px">
+        <div class="week-bar-label">This week</div>
+        <div class="week-bar-track"><div class="week-bar-fill" id="weekBarFill" style="width:0%"></div></div>
+        <div class="week-bar-stats">
+          <span class="week-bar-stat" id="wbSpent">₹0 spent</span>
+          <span class="week-bar-stat" id="wbReset" style="color:var(--text-faint)"></span>
+        </div>
+      </div>
     </div>
-
-    <div class="hero-balance">
-
-        <div class="hero-label">
-            LEFT THIS WEEK
-        </div>
-
-        <div
-            class="hero-amount"
-            id="gaugeAmount">
-            ₹0
-        </div>
-
-        <div
-            class="hero-limit"
-            id="gaugeOf">
-            of ₹0
-        </div>
-
-    </div>
-
-    <div class="hero-progress">
-
-        <div
-            class="hero-progress-fill"
-            id="weekBarFill">
-        </div>
-
-    </div>
-
-    <div class="hero-footer">
-
-        <div
-            class="hero-spent"
-            id="wbSpent">
-            ₹0 spent
-        </div>
-
-        <div
-            class="hero-percent"
-            id="gaugePct">
-            0% used
-        </div>
-
-    </div>
-
-</div>
-
-
-<button
-id="btnPay"
-class="floating-pay">
-
-    <span class="plus">
-        +
-    </span>
-
-    Pay
-
-</button>
-
-</section>
+  </section>
 
   <!-- ANALYTICS VIEW -->
   <section id="view-analytics" class="view">
