@@ -2,11 +2,15 @@
 
 const $ = id => document.getElementById(id);
 const fmt = n => "₹" + Math.round(n).toLocaleString("en-IN");
+const fmtShort = n => n >= 100000 ? (n / 100000).toFixed(1).replace(/\.0$/, "") + "L"
+  : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k"
+  : String(Math.round(n));
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let currentTxn = null;        // full txn record being processed
 let currentContact = null;
 let saveContactPending = null;
+let payeePeriod = "week";     // week | month | all
 
 // ── Toast ──
 function toast(msg, dur = 2200) {
@@ -18,7 +22,7 @@ function toast(msg, dur = 2200) {
 // Digits roll vertically (Apple-style ticker); symbols/commas fade in.
 // Slots are aligned from the RIGHT so the units digit stays the units digit.
 function createRoller(el) {
-  let slots = []; // right-aligned: slots[0] = rightmost char. {char, node, strip}
+  let slots = []; // right-aligned: slots[0] = rightmost char
 
   function makeDigitSlot() {
     const slot = document.createElement("span"); slot.className = "slot";
@@ -35,7 +39,7 @@ function createRoller(el) {
     return { node: s, strip: null };
   }
   function rollTo(slotObj, digit, instant) {
-    const y = -digit * 100 / 10; // strip is 10em tall; each digit is 10% of strip
+    const y = -digit * 10; // strip holds 10 digits; each is 10% of strip height
     if (instant) slotObj.strip.style.transition = "none";
     slotObj.strip.style.transform = `translateY(${y}%)`;
     if (instant) { void slotObj.strip.offsetHeight; slotObj.strip.style.transition = ""; }
@@ -57,8 +61,8 @@ function createRoller(el) {
         } else {
           const made = isDigit ? makeDigitSlot() : makeStaticSlot(ch);
           made.char = ch;
-          if (isDigit) rollTo(made, Number(ch), true); // new digits appear in place…
-          next.push(made); fresh.push(made);           // …with an enter animation
+          if (isDigit) rollTo(made, Number(ch), true);
+          next.push(made); fresh.push(made);
         }
       }
       slots = next;
@@ -103,11 +107,6 @@ function renderGauge() {
   wbFill.className = "week-bar-fill" + (tier !== "ok" ? " " + tier : "");
   $("wbSpent").textContent = fmt(spent) + " spent";
   $("wbReset").textContent = days <= 0 ? "resets today" : `resets in ${days}d`;
-
-  const streak = getStreak();
-  const sh = $("headerStreak");
-  if (streak > 0) { sh.textContent = `🔥 ${streak} wk${streak > 1 ? "s" : ""}`; sh.hidden = false; }
-  else sh.hidden = true;
   $("headerReset").textContent = days <= 0 ? "resets today" : `${days}d left`;
 
   const payBtn = $("btnPay");
@@ -164,12 +163,29 @@ $("sheetOverlay").addEventListener("click", () => {
 });
 $("btnCancelSheet").addEventListener("click", closeSheet);
 
-// ── Amount field: Apple Cash-style grow/shrink ──
+// ── Amount field: auto-size via a hidden mirror span ──
+// (measures the real rendered width of the digits, so nothing ever clips)
+const amtMirror = document.createElement("span");
+amtMirror.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre";
+document.body.appendChild(amtMirror);
+
 function fitAmount() {
   const f = $("amountField");
-  const len = Math.max(1, f.value.length);
-  f.style.width = (len * 0.62 + 0.5) + "ch";
-  f.style.fontSize = len <= 5 ? "58px" : len <= 7 ? "46px" : "38px";
+  const v = f.value || f.placeholder || "0";
+  const fs = v.length <= 5 ? 56 : v.length <= 8 ? 44 : 34;
+
+  const cs = getComputedStyle(f);
+  amtMirror.style.fontFamily = cs.fontFamily;
+  amtMirror.style.fontWeight = cs.fontWeight;
+  amtMirror.style.letterSpacing = cs.letterSpacing;
+  amtMirror.style.fontVariantNumeric = cs.fontVariantNumeric;
+  amtMirror.style.fontSize = fs + "px";
+  amtMirror.textContent = v;
+
+  f.style.fontSize = fs + "px";
+  $("amountSymbol").style.fontSize = Math.round(fs * 0.58) + "px";
+  const w = Math.min(amtMirror.offsetWidth + 6, window.innerWidth * 0.76);
+  f.style.width = w + "px";
   $("amountRow").classList.toggle("filled", f.value.length > 0);
 }
 
@@ -250,7 +266,7 @@ $("btnConfirmPay").addEventListener("click", () => {
     if (existing) currentContact = existing;
   }
 
-  // Pending txns now count against the budget → the hold is real.
+  // Pending txns count against the budget → the hold is real.
   currentTxn = addTxn({ contactName, contactId: currentContact?.id || null, amount, status: "pending" });
   renderGauge();
   showWaiting(currentTxn);
@@ -263,8 +279,7 @@ function showWaiting(txn) {
 }
 
 // ── Mark paid / cancelled ──
-// Contact stats are updated inside updateTxnStatus (single source of truth —
-// the old double call here was double-counting payee totals).
+// Contact stats are updated inside updateTxnStatus only (single source of truth).
 $("btnMarkPaid").addEventListener("click", () => {
   if (currentTxn) updateTxnStatus(currentTxn.id, "paid");
   showSuccess();
@@ -295,7 +310,6 @@ function showSuccess() {
   else msg = "Only " + fmt(getRemaining()) + " left. Make it count.";
   $("successMsg").textContent = msg;
 
-  // Restart the check-draw + particle burst
   const wrap = $("successWrap");
   wrap.classList.remove("animate"); void wrap.offsetWidth;
   launchParticles();
@@ -314,62 +328,187 @@ function launchParticles() {
     p.style.setProperty("--dx", Math.cos(angle) * dist + "px");
     p.style.setProperty("--dy", Math.sin(angle) * dist + "px");
     p.style.animationDelay = (0.4 + Math.random() * 0.25) + "s";
-    if (i % 3 === 0) { p.style.background = "#63E6A0"; }
-    if (i % 4 === 0) { p.style.width = p.style.height = "5px"; }
+    if (i % 3 === 0) p.style.background = "#7D7AFF";
+    if (i % 4 === 0) p.style.width = p.style.height = "5px";
     c.appendChild(p);
   }
 }
 
-// ── Analytics ──
+// ── Analytics ───────────────────────────────────────────────────
+
+const AVATAR_COLORS = ["#5E5CE6", "#66D4CF", "#FF9F0A", "#FF453A", "#BF5AF2", "#FF375F", "#64D2FF", "#30D158"];
+function avatarColor(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[h];
+}
+
+function paidTxns() { return getTxns().filter(t => t.status === "paid"); }
+
+function txnsInRange(txns, start, end) {
+  return txns.filter(t => { const d = new Date(t.date); return d >= start && (!end || d < end); });
+}
+
 function renderAnalytics() {
-  const streak = getStreak();
-  const spent = getSpentThisWeek();
-  const txns = getTxns().filter(t => t.status === "paid");
-  const thisWeekTxns = txns.filter(t => {
-    const ws = getWeekStart(new Date(), getConfig().weekStartDay);
-    return new Date(t.date) >= ws;
-  });
-  const biggest = thisWeekTxns.reduce((m, t) => Math.max(m, t.amount), 0);
+  const cfg = getConfig();
+  const now = new Date();
+  const weekStart = getWeekStart(now, cfg.weekStartDay);
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const all = paidTxns();
+  const thisWeek = txnsInRange(all, weekStart, null);
+  const lastWeek = txnsInRange(all, lastWeekStart, weekStart);
 
-  $("statStreak").textContent = streak + " wk" + (streak !== 1 ? "s" : "");
+  // ── Stat cards ──
+  const spent = thisWeek.reduce((s, t) => s + t.amount, 0);
+  const lastSpent = lastWeek.reduce((s, t) => s + t.amount, 0);
   $("statSpent").textContent = fmt(spent);
-  $("statCount").textContent = thisWeekTxns.length;
-  $("statBiggest").textContent = biggest > 0 ? fmt(biggest) : "—";
+  const deltaEl = $("statDelta");
+  if (lastSpent > 0) {
+    const diff = spent - lastSpent;
+    const pctDiff = Math.round(Math.abs(diff) / lastSpent * 100);
+    deltaEl.textContent = diff === 0 ? "same as last week" : `${diff > 0 ? "↑" : "↓"} ${pctDiff}% vs last week`;
+    deltaEl.className = "stat-card-sub " + (diff > 0 ? "up" : diff < 0 ? "down" : "");
+  } else { deltaEl.textContent = "no data last week"; deltaEl.className = "stat-card-sub"; }
 
-  const weeks = getWeeklyHistory();
-  const maxSpent = Math.max(...weeks.map(w => w.spent), 1);
-  $("chartBars").innerHTML = weeks.map(w => {
-    const h = Math.max(4, (w.spent / maxSpent) * 100);
-    const cls = w.spent > w.limit ? "over" : "ok";
-    return `<div class="chart-bar-wrap">
-      <div class="chart-bar-track"><div class="chart-bar-fill ${cls}" style="height:${h}%"></div></div>
-      <div class="chart-bar-label">${w.label.split(" ")[0]}</div>
+  const daysElapsed = Math.min(7, Math.max(1, Math.floor((now - weekStart) / 86400000) + 1));
+  $("statAvg").textContent = fmt(spent / daysElapsed);
+  $("statAvgSub").textContent = `over ${daysElapsed} day${daysElapsed > 1 ? "s" : ""}`;
+
+  $("statCount").textContent = thisWeek.length;
+  $("statCountSub").textContent = "this week";
+
+  const biggest = thisWeek.reduce((m, t) => t.amount > m.amount ? t : m, { amount: 0 });
+  $("statBiggest").textContent = biggest.amount > 0 ? fmt(biggest.amount) : "—";
+  $("statBiggestSub").textContent = biggest.amount > 0 ? "to " + biggest.contactName : "";
+
+  renderDayBars(thisWeek, weekStart, now);
+  renderTrend(cfg);
+  renderPayees(all, weekStart, now);
+  renderRecent();
+}
+
+// ── Spend per day (current week) ──
+function renderDayBars(thisWeek, weekStart, now) {
+  const perDay = Array(7).fill(0);
+  thisWeek.forEach(t => {
+    const i = Math.floor((new Date(t.date) - weekStart) / 86400000);
+    if (i >= 0 && i < 7) perDay[i] += t.amount;
+  });
+  const todayIdx = Math.floor((now - weekStart) / 86400000);
+  const max = Math.max(...perDay, 1);
+  const DOW = ["S", "M", "T", "W", "T", "F", "S"];
+
+  const endLabel = new Date(weekStart); endLabel.setDate(endLabel.getDate() + 6);
+  const fd = d => d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  $("dayRange").textContent = `${fd(weekStart)} – ${fd(endLabel)}`;
+
+  $("dayBars").innerHTML = perDay.map((amt, i) => {
+    const d = new Date(weekStart); d.setDate(d.getDate() + i);
+    const h = Math.max(3, (amt / max) * 100);
+    const cls = "day-bar-wrap" + (i === todayIdx ? " today" : "") + (i > todayIdx ? " future" : "");
+    return `<div class="${cls}">
+      <div class="day-val">${amt > 0 ? "₹" + fmtShort(amt) : ""}</div>
+      <div class="day-bar-track"><div class="day-bar-fill" style="height:${amt > 0 ? h : 0}%"></div></div>
+      <div class="day-label">${DOW[d.getDay()]}</div>
     </div>`;
   }).join("");
+}
 
-  const top = getTopPayees();
-  if (top.length === 0) {
-    $("peopleList").innerHTML = '<div class="empty-state">No payments yet.</div>';
-  } else {
-    const avatarColor = (name) => {
-      const colors = ["#30D158", "#0A84FF", "#FF9F0A", "#FF453A", "#BF5AF2", "#FF375F", "#64D2FF"];
-      let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % colors.length;
-      return colors[h];
-    };
-    $("peopleList").innerHTML = top.map(p => `
-      <div class="person-row">
-        <div class="person-avatar" style="background:${avatarColor(p.name)}">${escHtml(p.name[0].toUpperCase())}</div>
-        <div class="person-info">
-          <div class="person-name">${escHtml(p.name)}</div>
-          <div class="person-count">${p.count} payment${p.count !== 1 ? "s" : ""}</div>
-        </div>
-        <div class="person-total">${fmt(p.amount)}</div>
-      </div>`).join("");
+// ── 8-week trend (smooth SVG line + limit guide) ──
+function renderTrend(cfg) {
+  const weeks = getWeeklyHistory();
+  const W = 320, H = 130, padL = 8, padR = 30, padT = 16, padB = 20;
+  const max = Math.max(...weeks.map(w => w.spent), cfg.weeklyLimit, 1) * 1.08;
+  const x = i => padL + i * (W - padL - padR) / (weeks.length - 1);
+  const y = v => padT + (1 - v / max) * (H - padT - padB);
+
+  const pts = weeks.map((w, i) => [x(i), y(w.spent)]);
+  let line = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    line += `C${c1x.toFixed(1)},${c1y.toFixed(1)},${c2x.toFixed(1)},${c2y.toFixed(1)},${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
   }
+  const base = H - padB;
+  const area = line + `L${pts[pts.length - 1][0]},${base}L${pts[0][0]},${base}Z`;
+  const yLimit = y(cfg.weeklyLimit);
 
+  const dots = pts.map(([px, py], i) =>
+    `<circle class="trend-dot${i === pts.length - 1 ? " last" : ""}" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${i === pts.length - 1 ? 4 : 2.5}"/>`
+  ).join("");
+  const labels = weeks.map((w, i) =>
+    i % 2 === 1 ? `<text class="trend-x-label" x="${x(i).toFixed(1)}" y="${H - 5}" text-anchor="middle">${w.label.split(" ")[0]} ${w.label.split(" ")[1] || ""}</text>` : ""
+  ).join("");
+
+  $("trendChart").innerHTML = `
+  <svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7D7AFF" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="#7D7AFF" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line class="trend-limit" x1="${padL}" y1="${yLimit.toFixed(1)}" x2="${W - padR}" y2="${yLimit.toFixed(1)}"/>
+    <text class="trend-limit-label" x="${W - padR + 4}" y="${(yLimit + 3).toFixed(1)}">limit</text>
+    <path class="trend-area" d="${area}" fill="url(#trendFill)"/>
+    <path class="trend-line" d="${line}" pathLength="1"/>
+    ${dots}${labels}
+  </svg>`;
+}
+
+// ── By payee: grouped from actual transactions, sorted by amount ──
+function renderPayees(all, weekStart, now) {
+  let txns;
+  if (payeePeriod === "week") txns = txnsInRange(all, weekStart, null);
+  else if (payeePeriod === "month") {
+    const from = new Date(now); from.setDate(from.getDate() - 30);
+    txns = txnsInRange(all, from, null);
+  } else txns = all;
+
+  const groups = new Map();
+  txns.forEach(t => {
+    const key = t.contactName.trim().toLowerCase();
+    const g = groups.get(key) || { name: t.contactName.trim(), amount: 0, count: 0 };
+    g.amount += t.amount; g.count++;
+    groups.set(key, g);
+  });
+  const payees = [...groups.values()].sort((a, b) => b.amount - a.amount).slice(0, 8);
+  const total = payees.reduce((s, p) => s + p.amount, 0);
+  const maxAmt = payees.length ? payees[0].amount : 1;
+
+  if (payees.length === 0) {
+    $("payeeList").innerHTML = `<div class="empty-state">No payments ${payeePeriod === "all" ? "yet" : "in this period"}.</div>`;
+    return;
+  }
+  $("payeeList").innerHTML = payees.map(p => `
+    <div class="payee-row">
+      <div class="payee-top">
+        <div class="payee-avatar" style="background:${avatarColor(p.name)}">${escHtml(p.name[0].toUpperCase())}</div>
+        <div class="payee-name">${escHtml(p.name)}</div>
+        <div class="payee-amount">${fmt(p.amount)}</div>
+      </div>
+      <div class="payee-bar-track"><div class="payee-bar-fill" style="width:${Math.max(3, p.amount / maxAmt * 100)}%"></div></div>
+      <div class="payee-meta">
+        <span>${p.count} payment${p.count !== 1 ? "s" : ""}</span>
+        <span>${Math.round(p.amount / total * 100)}% of spend</span>
+      </div>
+    </div>`).join("");
+}
+
+$("payeeSeg").querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    payeePeriod = b.dataset.period;
+    $("payeeSeg").querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b));
+    const cfg = getConfig();
+    renderPayees(paidTxns(), getWeekStart(new Date(), cfg.weekStartDay), new Date());
+  });
+});
+
+// ── Recent ──
+function renderRecent() {
   const recent = getRecentTxns(15);
-  if (recent.length === 0) { $("txnList").innerHTML = '<div class="empty-state">Nothing yet.</div>'; }
-  else $("txnList").innerHTML = recent.map(t => {
+  if (recent.length === 0) { $("txnList").innerHTML = '<div class="empty-state">Nothing yet.</div>'; return; }
+  $("txnList").innerHTML = recent.map(t => {
     const d = new Date(t.date);
     const ds = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + " · " +
       d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -421,9 +560,8 @@ function escHtml(s) {
 }
 
 // ── Resume a pending payment ────────────────────────────────────
-// iOS often reloads the PWA when you switch to your UPI app and back,
-// which used to lose the "did you pay?" screen. On load (and on return
-// to the app), re-open it for any recent unresolved payment.
+// iOS often reloads the PWA when you switch to your UPI app and back;
+// re-open the "did you pay?" screen for any recent unresolved payment.
 function resumePendingIfAny() {
   expireStalePendings();
   const pending = getLatestPending();
@@ -445,5 +583,4 @@ if ("serviceWorker" in navigator)
 
 loadSettings();
 fitAmount();
-// First paint at 0, then animate the ring + odometer up to the real value.
 requestAnimationFrame(() => resumePendingIfAny());

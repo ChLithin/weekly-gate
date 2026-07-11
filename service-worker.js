@@ -1,4 +1,4 @@
-const CACHE = "weekly-gate-v2";
+const CACHE = "weekly-gate-v3";
 const ASSETS = [
   "./",
   "./index.html",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
-<meta name="theme-color" content="#000000"/>
+<meta name="theme-color" content="#08080D"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>Weekly Gate</title>
@@ -15,10 +15,7 @@
 <div id="app">
   <header class="app-header">
     <span class="app-wordmark">Weekly Gate</span>
-    <div class="header-right">
-      <span class="chip streak" id="headerStreak" hidden>🔥 0 wk</span>
-      <span class="chip" id="headerReset"></span>
-    </div>
+    <span class="chip" id="headerReset"></span>
   </header>
 
   <main>
@@ -28,11 +25,11 @@
         <svg class="gauge-svg" viewBox="0 0 220 220">
           <defs>
             <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#30D158"/>
-              <stop offset="100%" stop-color="#63E6A0"/>
+              <stop offset="0%" stop-color="#7D7AFF"/>
+              <stop offset="100%" stop-color="#66D4CF"/>
             </linearGradient>
             <linearGradient id="ringGradWarn" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#FF9F0A"/>
+              <stop offset="0%" stop-color="#FFB340"/>
               <stop offset="100%" stop-color="#FFD60A"/>
             </linearGradient>
             <linearGradient id="ringGradDanger" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -67,20 +64,49 @@
     <!-- ANALYTICS -->
     <section id="view-analytics" class="view">
       <h1 class="large-title">Activity</h1>
+
       <div class="stat-cards">
-        <div class="stat-card"><div class="stat-card-label">🔥 Streak</div><div class="stat-card-value streak" id="statStreak">0 wks</div></div>
-        <div class="stat-card"><div class="stat-card-label">This week</div><div class="stat-card-value" id="statSpent">₹0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Payments</div><div class="stat-card-value green" id="statCount">0</div></div>
-        <div class="stat-card"><div class="stat-card-label">Biggest</div><div class="stat-card-value" id="statBiggest">₹0</div></div>
+        <div class="stat-card">
+          <div class="stat-card-label">This week</div>
+          <div class="stat-card-value" id="statSpent">₹0</div>
+          <div class="stat-card-sub" id="statDelta"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Daily average</div>
+          <div class="stat-card-value accent" id="statAvg">₹0</div>
+          <div class="stat-card-sub" id="statAvgSub"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Payments</div>
+          <div class="stat-card-value" id="statCount">0</div>
+          <div class="stat-card-sub" id="statCountSub"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-label">Biggest</div>
+          <div class="stat-card-value" id="statBiggest">—</div>
+          <div class="stat-card-sub" id="statBiggestSub"></div>
+        </div>
       </div>
 
       <div class="inset-card"><div class="card-pad">
-        <div class="card-title">8-week spend</div>
-        <div class="chart-bars" id="chartBars"></div>
+        <div class="card-title">Spend per day <span class="card-title-note" id="dayRange"></span></div>
+        <div class="day-bars" id="dayBars"></div>
       </div></div>
 
-      <div class="group-label">Top payees</div>
-      <div class="inset-card" style="margin-top:0" id="peopleList"><div class="empty-state">No payments yet.</div></div>
+      <div class="inset-card"><div class="card-pad">
+        <div class="card-title">8-week trend</div>
+        <div id="trendChart"></div>
+      </div></div>
+
+      <div class="group-head">
+        <span class="group-label">By payee</span>
+        <div class="seg" id="payeeSeg">
+          <button data-period="week" class="active">Week</button>
+          <button data-period="month">Month</button>
+          <button data-period="all">All</button>
+        </div>
+      </div>
+      <div class="inset-card" style="margin-top:0" id="payeeList"><div class="empty-state">No payments yet.</div></div>
 
       <div class="group-label">Recent</div>
       <div class="inset-card" style="margin-top:0" id="txnList"><div class="empty-state">Nothing yet.</div></div>
@@ -132,7 +158,7 @@
     <div class="sheet-title">Pay</div>
     <div class="amount-entry">
       <div class="amount-row" id="amountRow">
-        <span class="amount-symbol">₹</span>
+        <span class="amount-symbol" id="amountSymbol">₹</span>
         <input class="amount-field" id="amountField" type="number" inputmode="decimal" placeholder="0"/>
       </div>
     </div>
@@ -144,7 +170,7 @@
     </div>
 
     <div class="budget-status" id="budgetStatus" hidden></div>
-    <button class="sheet-btn sheet-btn-money" id="btnConfirmPay" disabled>Continue</button>
+    <button class="sheet-btn sheet-btn-primary" id="btnConfirmPay" disabled>Continue</button>
     <button class="sheet-btn sheet-btn-ghost" id="btnCancelSheet">Cancel</button>
   </div>
 
@@ -156,7 +182,7 @@
       <div class="waiting-label"><strong id="waitingContact"></strong> is waiting to be paid.<br/>Open your UPI app and pay this amount.</div>
       <div class="waiting-sub">This amount is held from your budget until you confirm.</div>
     </div>
-    <button class="sheet-btn sheet-btn-money" id="btnMarkPaid">Yes, I paid</button>
+    <button class="sheet-btn sheet-btn-primary" id="btnMarkPaid">Yes, I paid</button>
     <button class="sheet-btn sheet-btn-ghost" id="btnMarkCancelled">Didn't pay</button>
   </div>
 

@@ -90,18 +90,6 @@ function getWeeklyHistory() {
   return weeks;
 }
 
-// Streak: consecutive weeks under budget
-function getStreak() {
-  const cfg = getConfig(); let streak = 0;
-  for (let i = 1; i <= 12; i++) {
-    const refDate = new Date(); refDate.setDate(refDate.getDate() - i * 7);
-    const ws = getWeekStart(refDate, cfg.weekStartDay); const we = getWeekEnd(ws);
-    const spent = getTxns().filter(t => t.status==="paid" && new Date(t.date)>=ws && new Date(t.date)<we)
-      .reduce((s,t) => s+t.amount, 0);
-    if (spent <= cfg.weeklyLimit) streak++; else break;
-  }
-  return streak;
-}
 
 // Contacts
 function getContacts() {
@@ -131,9 +119,6 @@ function searchContacts(query) {
 }
 
 // Analytics
-function getTopPayees() {
-  return getContactsByFrequency().slice(0, 5).map(c => ({ name: c.name, amount: c.totalPaid, count: c.payCount }));
-}
 function getRecentTxns(n = 20) { return getTxns().slice(0, n); }
 
 // Backup
