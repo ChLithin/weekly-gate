@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
-<meta name="theme-color" content="#0A0A12"/>
+<meta name="theme-color" content="#000000"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>Weekly Gate</title>
@@ -12,91 +12,115 @@
 <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
-<header class="app-header">
-  <span class="app-wordmark">Weekly Gate</span>
-  <span class="app-streak" id="headerStreak" hidden>🔥 0 weeks</span>
-  <span class="app-reset" id="headerReset"></span>
-</header>
+<div id="app">
+  <header class="app-header">
+    <span class="app-wordmark">Weekly Gate</span>
+    <div class="header-right">
+      <span class="chip streak" id="headerStreak" hidden>🔥 0 wk</span>
+      <span class="chip" id="headerReset"></span>
+    </div>
+  </header>
 
-<main>
-  <!-- HOME VIEW -->
-  <section id="view-home" class="view active">
-    <div class="gauge-screen">
+  <main>
+    <!-- HOME -->
+    <section id="view-home" class="view active">
       <div class="gauge-wrap">
         <svg class="gauge-svg" viewBox="0 0 220 220">
-          <circle class="gauge-track" cx="110" cy="110" r="90"
-            stroke-dasharray="565" stroke-dashoffset="0"/>
-          <circle class="gauge-fill" id="gaugeFill" cx="110" cy="110" r="90"
-            stroke-dasharray="565" stroke-dashoffset="565" stroke="var(--accent)"/>
+          <defs>
+            <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#30D158"/>
+              <stop offset="100%" stop-color="#63E6A0"/>
+            </linearGradient>
+            <linearGradient id="ringGradWarn" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF9F0A"/>
+              <stop offset="100%" stop-color="#FFD60A"/>
+            </linearGradient>
+            <linearGradient id="ringGradDanger" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FF453A"/>
+              <stop offset="100%" stop-color="#FF6961"/>
+            </linearGradient>
+          </defs>
+          <circle class="gauge-track" cx="110" cy="110" r="92"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="110" cy="110" r="92"
+            stroke="url(#ringGrad)" stroke-dasharray="578" stroke-dashoffset="578"/>
         </svg>
         <div class="gauge-center">
           <div class="gauge-label">Left this week</div>
-          <div class="gauge-amount" id="gaugeAmount">₹0</div>
+          <div class="roller" id="gaugeAmount" aria-live="polite"></div>
           <div class="gauge-of" id="gaugeOf">of ₹0</div>
           <div class="gauge-pct" id="gaugePct">0% used</div>
         </div>
       </div>
 
-      <button class="pay-btn" id="btnPay">Pay →</button>
+      <button class="pay-btn" id="btnPay">Pay</button>
 
-      <div class="week-bar" style="margin-top:20px">
-        <div class="week-bar-label">This week</div>
+      <div class="inset-card"><div class="card-pad">
+        <div class="card-title">This week</div>
         <div class="week-bar-track"><div class="week-bar-fill" id="weekBarFill" style="width:0%"></div></div>
         <div class="week-bar-stats">
           <span class="week-bar-stat" id="wbSpent">₹0 spent</span>
-          <span class="week-bar-stat" id="wbReset" style="color:var(--text-faint)"></span>
+          <span class="week-bar-stat faint" id="wbReset"></span>
         </div>
+      </div></div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section id="view-analytics" class="view">
+      <h1 class="large-title">Activity</h1>
+      <div class="stat-cards">
+        <div class="stat-card"><div class="stat-card-label">🔥 Streak</div><div class="stat-card-value streak" id="statStreak">0 wks</div></div>
+        <div class="stat-card"><div class="stat-card-label">This week</div><div class="stat-card-value" id="statSpent">₹0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Payments</div><div class="stat-card-value green" id="statCount">0</div></div>
+        <div class="stat-card"><div class="stat-card-label">Biggest</div><div class="stat-card-value" id="statBiggest">₹0</div></div>
       </div>
-    </div>
-  </section>
 
-  <!-- ANALYTICS VIEW -->
-  <section id="view-analytics" class="view">
-    <div class="stat-cards">
-      <div class="stat-card"><div class="stat-card-label">🔥 Streak</div><div class="stat-card-value streak" id="statStreak">0 wks</div></div>
-      <div class="stat-card"><div class="stat-card-label">This week</div><div class="stat-card-value" id="statSpent">₹0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Payments</div><div class="stat-card-value green" id="statCount">0</div></div>
-      <div class="stat-card"><div class="stat-card-label">Biggest</div><div class="stat-card-value" id="statBiggest">₹0</div></div>
-    </div>
+      <div class="inset-card"><div class="card-pad">
+        <div class="card-title">8-week spend</div>
+        <div class="chart-bars" id="chartBars"></div>
+      </div></div>
 
-    <div class="weekly-chart">
-      <div class="section-head">8-week spend</div>
-      <div class="chart-bars" id="chartBars"></div>
-    </div>
+      <div class="group-label">Top payees</div>
+      <div class="inset-card" style="margin-top:0" id="peopleList"><div class="empty-state">No payments yet.</div></div>
 
-    <div class="section-head">Top payees</div>
-    <div class="people-list" id="peopleList"><div class="empty-state">No payments yet.</div></div>
+      <div class="group-label">Recent</div>
+      <div class="inset-card" style="margin-top:0" id="txnList"><div class="empty-state">Nothing yet.</div></div>
+    </section>
 
-    <div class="section-head" style="margin-top:18px">Recent</div>
-    <div id="txnList"><div class="empty-state">Nothing yet.</div></div>
-  </section>
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view">
+      <h1 class="large-title">Settings</h1>
 
-  <!-- SETTINGS VIEW -->
-  <section id="view-settings" class="view">
-    <div class="section-head">Budget</div>
-    <div class="field"><label>Weekly limit (₹)</label><input type="number" id="inputLimit" inputmode="numeric" min="0" step="50"/></div>
-    <div class="field"><label>Week resets on</label>
-      <select id="inputWeekStart">
-        <option value="1">Monday</option><option value="0">Sunday</option>
-        <option value="6">Saturday</option><option value="5">Friday</option>
-      </select>
-    </div>
-    <button class="sheet-btn sheet-btn-primary" id="btnSaveSettings">Save</button>
+      <div class="group-label" style="margin-top:0">Budget</div>
+      <div class="inset-card" style="margin-top:0">
+        <div class="settings-row">
+          <label for="inputLimit">Weekly limit (₹)</label>
+          <input type="number" id="inputLimit" inputmode="numeric" min="0" step="50"/>
+        </div>
+        <div class="settings-row">
+          <label for="inputWeekStart">Week resets on</label>
+          <select id="inputWeekStart">
+            <option value="1">Monday</option><option value="0">Sunday</option>
+            <option value="6">Saturday</option><option value="5">Friday</option>
+          </select>
+        </div>
+        <button class="settings-btn" id="btnSaveSettings">Save</button>
+      </div>
 
-    <div class="divider"></div>
-    <div class="section-head">Backup</div>
-    <p class="about-note">Safari clears PWA storage after ~7 days of inactivity. Export regularly.</p>
-    <div class="btn-row">
-      <button class="sheet-btn sheet-btn-ghost" id="btnExport">Export</button>
-      <button class="sheet-btn sheet-btn-ghost" id="btnImport">Import</button>
-    </div>
-    <input type="file" id="fileImport" accept="application/json" hidden/>
+      <div class="group-label">Backup</div>
+      <div class="inset-card" style="margin-top:0">
+        <button class="settings-btn" id="btnExport">Export backup</button>
+        <button class="settings-btn" id="btnImport">Import backup</button>
+      </div>
+      <p class="about-note">Safari clears PWA storage after ~7 days of inactivity. Export regularly.</p>
+      <input type="file" id="fileImport" accept="application/json" hidden/>
 
-    <div class="divider"></div>
-    <div class="section-head">Danger</div>
-    <button class="sheet-btn sheet-btn-danger" id="btnResetData" style="margin-top:4px">Erase all data</button>
-  </section>
-</main>
+      <div class="group-label">Danger</div>
+      <div class="inset-card" style="margin-top:0">
+        <button class="settings-btn destructive" id="btnResetData">Erase all data</button>
+      </div>
+    </section>
+  </main>
+</div>
 
 <!-- PAYMENT SHEET -->
 <div class="sheet-overlay" id="sheetOverlay"></div>
@@ -106,39 +130,44 @@
   <!-- State: input -->
   <div class="sheet-state active" id="stateInput">
     <div class="sheet-title">Pay</div>
-    <div class="amount-row">
-      <span class="amount-symbol">₹</span>
-      <input class="amount-field" id="amountField" type="number" inputmode="decimal" placeholder="0" autofocus/>
+    <div class="amount-entry">
+      <div class="amount-row" id="amountRow">
+        <span class="amount-symbol">₹</span>
+        <input class="amount-field" id="amountField" type="number" inputmode="decimal" placeholder="0"/>
+      </div>
     </div>
 
     <div class="contact-label">Paying who?</div>
     <div class="contact-input-wrap">
-      <input class="contact-input" id="contactInput" type="text" placeholder="Name or search saved..." autocomplete="off"/>
+      <input class="contact-input" id="contactInput" type="text" placeholder="Name or search saved…" autocomplete="off"/>
       <div class="contact-dropdown" id="contactDropdown" hidden></div>
     </div>
 
     <div class="budget-status" id="budgetStatus" hidden></div>
-    <button class="sheet-btn sheet-btn-primary" id="btnConfirmPay" disabled>Continue</button>
+    <button class="sheet-btn sheet-btn-money" id="btnConfirmPay" disabled>Continue</button>
     <button class="sheet-btn sheet-btn-ghost" id="btnCancelSheet">Cancel</button>
   </div>
 
   <!-- State: waiting -->
   <div class="sheet-state" id="stateWaiting">
     <div class="waiting-wrap">
-      <span class="waiting-coin">₹</span>
+      <div class="waiting-ring"></div>
       <div class="waiting-amount" id="waitingAmount">₹0</div>
-      <div class="waiting-label">is reserved for <strong id="waitingContact"></strong>.<br/>Go open your UPI app and pay this amount.</div>
-      <div class="waiting-sub">Come back here once you're done.</div>
+      <div class="waiting-label"><strong id="waitingContact"></strong> is waiting to be paid.<br/>Open your UPI app and pay this amount.</div>
+      <div class="waiting-sub">This amount is held from your budget until you confirm.</div>
     </div>
-    <button class="sheet-btn sheet-btn-success" id="btnMarkPaid">✓ Yes, I paid</button>
-    <button class="sheet-btn sheet-btn-ghost" id="btnMarkCancelled">✗ Didn't pay</button>
+    <button class="sheet-btn sheet-btn-money" id="btnMarkPaid">Yes, I paid</button>
+    <button class="sheet-btn sheet-btn-ghost" id="btnMarkCancelled">Didn't pay</button>
   </div>
 
   <!-- State: success -->
   <div class="sheet-state" id="stateSuccess">
-    <div class="success-wrap">
-      <div class="coins-container" id="coinsContainer"></div>
-      <div class="success-icon">✅</div>
+    <div class="success-wrap" id="successWrap">
+      <div class="particles" id="particles"></div>
+      <svg class="check-svg" viewBox="0 0 100 100">
+        <circle class="check-circle" cx="50" cy="50" r="42"/>
+        <path class="check-mark" d="M32 51 L45 64 L69 38"/>
+      </svg>
       <div class="success-amount" id="successAmount">₹0</div>
       <div class="success-contact" id="successContact"></div>
       <div class="success-msg" id="successMsg"></div>
@@ -149,7 +178,7 @@
   <!-- State: fail -->
   <div class="sheet-state" id="stateFail">
     <div class="fail-wrap">
-      <div class="fail-icon">↩️</div>
+      <div class="fail-icon">↩︎</div>
       <div class="fail-amount" id="failAmount">₹0</div>
       <div class="fail-msg">No worries — <strong id="failAmountReturn"></strong> is back in your budget.</div>
     </div>
@@ -160,9 +189,18 @@
 <div class="toast" id="toast"></div>
 
 <nav class="tabbar">
-  <button data-view="home" class="active"><span class="tab-icon">💰</span>Budget</button>
-  <button data-view="analytics"><span class="tab-icon">📊</span>Analytics</button>
-  <button data-view="settings"><span class="tab-icon">⚙️</span>Settings</button>
+  <button data-view="home" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M14.8 9.2c-.6-.9-1.6-1.4-2.8-1.4-1.7 0-3 .9-3 2.2s1.3 1.9 3 2.2c1.7.3 3 .9 3 2.2s-1.3 2.2-3 2.2c-1.2 0-2.2-.5-2.8-1.4"/></svg>
+    Budget
+  </button>
+  <button data-view="analytics">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V12M12 20V5M19 20v-6"/></svg>
+    Activity
+  </button>
+  <button data-view="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 7.08 4.1l.06.06a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10.12 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08c.26.63.88 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09c-.68 0-1.3.4-1.51 1.03Z"/></svg>
+    Settings
+  </button>
 </nav>
 
 <script src="js/storage.js" defer></script>

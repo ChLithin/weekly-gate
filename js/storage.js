@@ -41,10 +41,30 @@ function getWeekEnd(ws) { const d = new Date(ws); d.setDate(d.getDate() + 7); re
 function getWeekKey(date) { const ws = getWeekStart(date, getConfig().weekStartDay); return ws.toISOString().slice(0,10); }
 
 function getSpentThisWeek() {
+  // Pending payments count too — the "reserved" hold is real until you
+  // confirm or cancel. Stale pendings are auto-cancelled on app load.
   const cfg = getConfig(); const now = new Date();
   const start = getWeekStart(now, cfg.weekStartDay); const end = getWeekEnd(start);
-  return getTxns().filter(t => (t.status==="paid") && new Date(t.date)>=start && new Date(t.date)<end)
+  return getTxns().filter(t => (t.status==="paid" || t.status==="pending") && new Date(t.date)>=start && new Date(t.date)<end)
     .reduce((s,t) => s + t.amount, 0);
+}
+
+// Pending-payment lifecycle (iOS reloads the PWA when you app-switch,
+// so pending state must survive a reload)
+const PENDING_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+function getLatestPending() {
+  const now = Date.now();
+  return getTxns().find(t => t.status === "pending" && (now - new Date(t.date).getTime()) < PENDING_TTL_MS) || null;
+}
+function expireStalePendings() {
+  const now = Date.now(); let changed = false;
+  const txns = getTxns();
+  txns.forEach(t => {
+    if (t.status === "pending" && (now - new Date(t.date).getTime()) >= PENDING_TTL_MS) {
+      t.status = "cancelled"; changed = true;
+    }
+  });
+  if (changed) setTxns(txns);
 }
 function getRemaining() { return Math.max(0, getConfig().weeklyLimit - getSpentThisWeek()); }
 function daysUntilReset() {
