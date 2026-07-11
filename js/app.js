@@ -1,383 +1,341 @@
-// app.js — wires the UI to storage.js / upi.js / scanner.js.
+// app.js — Weekly Gate main controller
 
-let currentParsed = null;
+const $ = id => document.getElementById(id);
+const fmt = n => "₹" + Math.round(n).toLocaleString("en-IN");
+
 let currentTxnId = null;
+let currentAmount = 0;
+let currentContact = null;
+let saveContactPending = null;
 
-const $ = (id) => document.getElementById(id);
-
-function formatRupee(n) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
+// ── Toast ──
+function toast(msg, dur = 2200) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), dur);
 }
 
-function showToast(msg) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(t._hideTimer);
-  t._hideTimer = setTimeout(() => t.classList.remove("show"), 2200);
-}
-
-// ---------------- Stamp header ----------------
-
+// ── Gauge ──
 function renderGauge() {
   const cfg = getConfig();
   const spent = getSpentThisWeek();
   const remaining = getRemaining();
+  const pct = getPctUsed();
   const over = spent > cfg.weeklyLimit;
-  const pct = cfg.weeklyLimit > 0 ? Math.min(100, (spent / cfg.weeklyLimit) * 100) : 0;
-
-  $("stampAmount").textContent = formatRupee(remaining);
-  $("stampAmount").classList.toggle("over", over);
-  $("gaugeOf").textContent = `of ${formatRupee(cfg.weeklyLimit)} weekly limit`;
-  $("gaugeFill").style.width = pct + "%";
-  $("gaugeFill").classList.toggle("over", over);
-  $("stampOver").hidden = !over;
-
   const days = daysUntilReset();
-  $("gaugeReset").textContent = days <= 0 ? "resets today" : `resets in ${days} day${days === 1 ? "" : "s"}`;
+
+  // Circumference for r=90 is 2π×90 ≈ 565
+  const C = 565;
+  const offset = C - (pct / 100) * C;
+  const fill = $("gaugeFill");
+  fill.style.strokeDashoffset = offset;
+  const color = pct < 60 ? "var(--accent)" : pct < 85 ? "var(--warning)" : "var(--danger)";
+  fill.style.stroke = color;
+
+  const amEl = $("gaugeAmount");
+  amEl.textContent = fmt(remaining);
+  amEl.className = "gauge-amount" + (pct >= 85 ? " danger" : pct >= 60 ? " warn" : "");
+  $("gaugeOf").textContent = `of ${fmt(cfg.weeklyLimit)}`;
+  $("gaugePct").textContent = over ? "Over budget!" : `${Math.round(pct)}% used`;
+
+  const wbFill = $("weekBarFill");
+  wbFill.style.width = Math.min(100, pct) + "%";
+  wbFill.className = "week-bar-fill" + (pct >= 85 ? " danger" : pct >= 60 ? " warn" : "");
+  $("wbSpent").textContent = fmt(spent) + " spent";
+  $("wbReset").textContent = days <= 0 ? "resets today" : `resets in ${days}d`;
+
+  const streak = getStreak();
+  const sh = $("headerStreak");
+  if (streak > 0) { sh.textContent = `🔥 ${streak} week${streak>1?"s":""}`; sh.hidden = false; }
+  else sh.hidden = true;
+  $("headerReset").textContent = days <= 0 ? "resets today" : `${days}d left`;
+
+  const payBtn = $("btnPay");
+  payBtn.className = over ? "pay-btn disabled" : "pay-btn";
+  payBtn.disabled = over;
+  payBtn.textContent = over ? "Over weekly limit" : "Pay →";
 }
 
-// ---------------- Tabs ----------------
-
-function setActiveView(name) {
-  document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
-  $("view-" + name).classList.add("active");
-  document.querySelectorAll("nav.tabbar button").forEach((b) => {
-    b.classList.toggle("active", b.dataset.view === name);
+// ── Tabs ──
+document.querySelectorAll("nav.tabbar button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.querySelectorAll("nav.tabbar button").forEach(b => b.classList.remove("active"));
+    $("view-" + btn.dataset.view).classList.add("active");
+    btn.classList.add("active");
+    if (btn.dataset.view === "analytics") renderAnalytics();
   });
-  if (name !== "scan") {
-    stopScanner();
-    resetScanFlow();
-  }
-  if (name === "history") {
-    renderMerchantList();
-    renderTxnList();
-  }
-}
-
-document.querySelectorAll("nav.tabbar button").forEach((btn) => {
-  btn.addEventListener("click", () => setActiveView(btn.dataset.view));
 });
 
-// ---------------- Scan flow ----------------
-
-function resetScanFlow() {
-  $("scanIdle").hidden = false;
-  $("scanLive").hidden = true;
-  $("btnCancelScan").hidden = true;
-  $("scanConfirm").hidden = true;
-  $("scanFollowup").hidden = true;
-  currentParsed = null;
+// ── Payment sheet ──
+function openSheet() {
+  $("sheetOverlay").classList.add("show");
+  $("paySheet").classList.add("show");
+  setSheetState("input");
+  $("amountField").value = "";
+  $("contactInput").value = "";
+  $("budgetStatus").hidden = true;
+  $("btnConfirmPay").disabled = true;
+  currentContact = null;
+  saveContactPending = null;
+  setTimeout(() => $("amountField").focus(), 300);
+}
+function closeSheet() {
+  $("sheetOverlay").classList.remove("show");
+  $("paySheet").classList.remove("show");
+}
+function setSheetState(state) {
+  ["input","waiting","success","fail"].forEach(s => {
+    $("state" + s.charAt(0).toUpperCase() + s.slice(1)).classList.toggle("active", s === state);
+  });
 }
 
-$("btnStartScan").addEventListener("click", async () => {
-  $("scanIdle").hidden = true;
-  $("scanLive").hidden = false;
-  $("btnCancelScan").hidden = false;
-  await startScanner($("scanVideo"), $("scanCanvas"), onDecoded, onScanError);
+$("btnPay").addEventListener("click", openSheet);
+$("sheetOverlay").addEventListener("click", () => {
+  if ($("stateInput").classList.contains("active")) closeSheet();
 });
+$("btnCancelSheet").addEventListener("click", closeSheet);
 
-$("btnCancelScan").addEventListener("click", () => {
-  stopScanner();
-  resetScanFlow();
-});
-
-function onScanError(err) {
-  console.error(err);
-  showToast("Camera access denied — enable it in iPhone Settings > Safari > Camera");
-  resetScanFlow();
-}
-
-function onDecoded(raw) {
-  $("scanLive").hidden = true;
-  $("btnCancelScan").hidden = true;
-
-  const parsed = parseUpiString(raw);
-  if (!parsed) {
-    showToast("That QR isn't a UPI payment code");
-    resetScanFlow();
-    return;
-  }
-
-  currentParsed = parsed;
-  $("scanConfirm").hidden = false;
-  $("confirmMerchant").textContent = parsed.pn || "Unknown merchant";
-  $("confirmVpa").textContent = parsed.pa || "";
-
-  if (parsed.am && Number(parsed.am) > 0) {
-    $("amountInput").hidden = true;
-    $("confirmAmount").hidden = false;
-    $("confirmAmount").textContent = formatRupee(Number(parsed.am));
-    updatePayState(Number(parsed.am));
-  } else {
-    $("confirmAmount").hidden = true;
-    $("amountInput").hidden = false;
-    $("amountInput").value = "";
-    updatePayState(0);
-  }
-}
-
-$("amountInput").addEventListener("input", () => {
-  updatePayState(Number($("amountInput").value) || 0);
-});
-
-function updatePayState(amount) {
+// ── Amount + budget check ──
+function checkBudget() {
+  const amount = Number($("amountField").value) || 0;
+  const contact = $("contactInput").value.trim();
   const remaining = getRemaining();
-  const payButtons = document.querySelectorAll(".pay-app-btn");
-  const pill = $("confirmPill");
-  const note = $("confirmRemainingNote");
+  const st = $("budgetStatus");
 
-  const setButtons = (enabled, primaryFirst) => {
-    payButtons.forEach((btn, i) => {
-      btn.disabled = !enabled;
-      btn.className = !enabled
-        ? "btn btn-block-disabled pay-app-btn"
-        : i === 0 && primaryFirst
-        ? "btn btn-primary pay-app-btn"
-        : "btn btn-ghost pay-app-btn";
-    });
-  };
+  if (amount <= 0 || !contact) { st.hidden = true; $("btnConfirmPay").disabled = true; return; }
 
-  if (amount <= 0) {
-    setButtons(false);
-    pill.className = "status-pill";
-    pill.textContent = "Enter an amount";
-    note.style.display = "none";
-    return;
-  }
-
-  if (amount <= remaining) {
-    setButtons(true, true);
-    pill.className = "status-pill ok";
-    pill.textContent = "Within budget";
-    note.style.display = "none";
+  st.hidden = false;
+  if (amount <= remaining * 0.5) {
+    st.className = "budget-status ok";
+    st.textContent = `✓ ${fmt(remaining - amount)} will remain after this`;
+  } else if (amount <= remaining) {
+    st.className = "budget-status warn";
+    st.textContent = `⚠ Only ${fmt(remaining - amount)} will be left — spend carefully`;
   } else {
-    setButtons(false);
-    pill.className = "status-pill blocked";
-    pill.textContent = "Over weekly limit";
-    const days = daysUntilReset();
-    note.style.display = "block";
-    note.textContent = `You have ${formatRupee(remaining)} left this week — that's ${formatRupee(
-      amount - remaining
-    )} over. Resets in ${days} day${days === 1 ? "" : "s"}.`;
+    st.className = "budget-status over";
+    st.textContent = `✗ ${fmt(amount)} exceeds your ${fmt(remaining)} left`;
+    $("btnConfirmPay").disabled = true; return;
   }
+  $("btnConfirmPay").disabled = false;
 }
 
-$("btnRescan").addEventListener("click", () => {
-  resetScanFlow();
-});
+$("amountField").addEventListener("input", checkBudget);
+$("contactInput").addEventListener("input", () => { checkBudget(); renderContactDropdown(); });
 
-$("btnCopyVpa").addEventListener("click", async () => {
-  const amount = currentParsed.am || $("amountInput").value || "0";
-  const text = `${currentParsed.pa}  ·  ${currentParsed.pn}  ·  ${formatRupee(Number(amount))}`;
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast("Copied UPI details");
-  } catch {
-    showToast(text);
-  }
-});
+// ── Contact dropdown ──
+function renderContactDropdown() {
+  const q = $("contactInput").value.trim();
+  const dd = $("contactDropdown");
+  if (!q) { dd.hidden = true; return; }
 
-document.querySelectorAll(".pay-app-btn").forEach((btn) => {
-  btn.addEventListener("click", () => payWith(btn.dataset.app));
-});
+  const matches = searchContacts(q);
+  const exactMatch = matches.find(c => c.name.toLowerCase() === q.toLowerCase());
+  let html = matches.slice(0, 5).map(c =>
+    `<div class="contact-opt" data-id="${c.id}" data-name="${escHtml(c.name)}">
+      <span>${escHtml(c.name)}</span>
+      <span class="contact-opt-count">${c.payCount}× · ${fmt(c.totalPaid)}</span>
+    </div>`
+  ).join("");
+  if (!exactMatch) html += `<div class="save-contact-row" id="saveContactOpt">+ Save "${escHtml(q)}"</div>`;
 
-function payWith(appKey) {
-  if (!currentParsed) return;
-  const amount = currentParsed.am && Number(currentParsed.am) > 0
-    ? Number(currentParsed.am)
-    : Number($("amountInput").value) || 0;
-  if (amount <= 0 || amount > getRemaining()) return;
+  dd.innerHTML = html; dd.hidden = false;
 
-  const record = addTxn({
-    merchant: currentParsed.pn,
-    vpa: currentParsed.pa,
-    amount,
-    status: "pending",
+  dd.querySelectorAll(".contact-opt").forEach(el => {
+    el.addEventListener("click", () => {
+      const contacts = getContacts();
+      currentContact = contacts.find(c => c.id === el.dataset.id) || null;
+      $("contactInput").value = el.dataset.name;
+      dd.hidden = true; saveContactPending = null; checkBudget();
+    });
   });
+  const saveOpt = $("saveContactOpt");
+  if (saveOpt) saveOpt.addEventListener("click", () => {
+    saveContactPending = q; dd.hidden = true; checkBudget();
+    toast('Will save "' + q + '" after payment');
+  });
+}
+
+document.addEventListener("click", e => {
+  if (!$("contactDropdown").contains(e.target) && e.target !== $("contactInput"))
+    $("contactDropdown").hidden = true;
+});
+
+// ── Confirm → waiting ──
+$("btnConfirmPay").addEventListener("click", () => {
+  const amount = Number($("amountField").value) || 0;
+  const contactName = $("contactInput").value.trim();
+  if (amount <= 0 || !contactName || amount > getRemaining()) return;
+
+  // Save contact if requested
+  if (saveContactPending && !currentContact) currentContact = saveContact(saveContactPending);
+  else if (!currentContact && contactName) {
+    const existing = searchContacts(contactName).find(c => c.name.toLowerCase() === contactName.toLowerCase());
+    if (existing) currentContact = existing;
+  }
+
+  currentAmount = amount;
+  const record = addTxn({ contactName, contactId: currentContact?.id || null, amount, status: "pending" });
   currentTxnId = record.id;
   renderGauge();
 
-  const link = buildAppLink(appKey, currentParsed.rawParams, amount);
+  $("waitingAmount").textContent = fmt(amount);
+  $("waitingContact").textContent = contactName;
+  setSheetState("waiting");
+});
 
-  $("scanConfirm").hidden = true;
-  $("scanFollowup").hidden = false;
-
-  // Hand off to the UPI app. window.location.href is sometimes unreliable for
-  // custom-scheme navigation on iOS (especially from a home-screen "standalone"
-  // PWA) — a programmatically clicked link tends to be handled more consistently.
-  triggerAppLink(link);
-}
-
-function triggerAppLink(link) {
-  const a = document.createElement("a");
-  a.href = link;
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => a.remove(), 200);
-}
-
+// ── Mark paid / cancelled ──
 $("btnMarkPaid").addEventListener("click", () => {
   if (currentTxnId) updateTxnStatus(currentTxnId, "paid");
-  finishFollowup("Logged to this week's ledger");
-});
-
-$("btnMarkFailed").addEventListener("click", () => {
-  if (currentTxnId) updateTxnStatus(currentTxnId, "failed");
-  finishFollowup("Not counted against your budget");
-});
-
-function finishFollowup(message) {
-  currentTxnId = null;
-  resetScanFlow();
+  if (currentContact) updateContactStats(currentContact.id, currentAmount);
+  showSuccess();
   renderGauge();
-  showToast(message);
+});
+
+$("btnMarkCancelled").addEventListener("click", () => {
+  if (currentTxnId) updateTxnStatus(currentTxnId, "cancelled");
+  $("failAmount").textContent = fmt(currentAmount);
+  $("failAmountReturn").textContent = fmt(currentAmount);
+  setSheetState("fail");
+  renderGauge();
+});
+
+$("btnFailDone").addEventListener("click", closeSheet);
+$("btnDone").addEventListener("click", closeSheet);
+
+function showSuccess() {
+  const cfg = getConfig(); const spent = getSpentThisWeek(); const pct = getPctUsed();
+  $("successAmount").textContent = fmt(currentAmount);
+  const txns = getTxns(); const today = txns.filter(t => {
+    const d = new Date(t.date); const now = new Date();
+    return t.status==="paid" && d.toDateString()===now.toDateString();
+  });
+  const name = $("contactInput").value.trim();
+  $("successContact").textContent = "→ " + name;
+
+  let msg = "";
+  if (pct <= 50) msg = "You're doing great — " + fmt(getRemaining()) + " still left!";
+  else if (pct <= 80) msg = fmt(getRemaining()) + " remaining. Pace yourself.";
+  else msg = "Only " + fmt(getRemaining()) + " left. Make it count.";
+  $("successMsg").textContent = msg;
+
+  launchCoins();
+  setSheetState("success");
 }
 
-// On load, if there's a very recent pending payment (e.g. the app reloaded after
-// switching to a UPI app), resume the follow-up question instead of losing it.
-function resumePendingIfAny() {
-  const txns = getTxns();
-  const recentPending = txns.find(
-    (t) => t.status === "pending" && Date.now() - new Date(t.date).getTime() < 30 * 60 * 1000
-  );
-  if (recentPending) {
-    currentTxnId = recentPending.id;
-    setActiveView("scan");
-    $("scanIdle").hidden = true;
-    $("scanFollowup").hidden = false;
+function launchCoins() {
+  const c = $("coinsContainer"); c.innerHTML = "";
+  for (let i = 0; i < 12; i++) {
+    const coin = document.createElement("div");
+    coin.className = "coin"; coin.textContent = "₹";
+    const x = 20 + Math.random() * 60;
+    const delay = Math.random() * 0.5;
+    coin.style.cssText = `left:${x}%;bottom:0;animation-delay:${delay}s;animation-duration:${0.9+Math.random()*0.6}s`;
+    c.appendChild(coin);
   }
 }
 
-// ---------------- History ----------------
+// ── Analytics ──
+function renderAnalytics() {
+  const streak = getStreak();
+  const spent = getSpentThisWeek();
+  const txns = getTxns().filter(t => t.status==="paid");
+  const thisWeekTxns = txns.filter(t => {
+    const ws = getWeekStart(new Date(), getConfig().weekStartDay);
+    return new Date(t.date) >= ws;
+  });
+  const biggest = thisWeekTxns.reduce((m,t) => Math.max(m, t.amount), 0);
 
-function renderMerchantList() {
-  const totals = getMerchantTotals();
-  const container = $("merchantList");
-  if (totals.length === 0) {
-    container.innerHTML = '<div class="empty-state">No payments yet.</div>';
-    return;
+  $("statStreak").textContent = streak + " wk" + (streak!==1?"s":"");
+  $("statSpent").textContent = fmt(spent);
+  $("statCount").textContent = thisWeekTxns.length;
+  $("statBiggest").textContent = biggest > 0 ? fmt(biggest) : "—";
+
+  // Weekly chart
+  const weeks = getWeeklyHistory();
+  const maxSpent = Math.max(...weeks.map(w => w.spent), 1);
+  $("chartBars").innerHTML = weeks.map(w => {
+    const h = Math.max(4, (w.spent / maxSpent) * 100);
+    const cls = w.spent > w.limit ? "over" : "ok";
+    return `<div class="chart-bar-wrap">
+      <div class="chart-bar-track"><div class="chart-bar-fill ${cls}" style="height:${h}%"></div></div>
+      <div class="chart-bar-label">${w.label.split(" ")[0]}</div>
+    </div>`;
+  }).join("");
+
+  // People
+  const top = getTopPayees();
+  if (top.length === 0) {
+    $("peopleList").innerHTML = '<div class="empty-state">No payments yet.</div>';
+  } else {
+    const avatarColor = (name) => {
+      const colors = ["#7C6FF7","#10B981","#F59E0B","#F43F5E","#3B82F6","#EC4899","#14B8A6"];
+      let h = 0; for (const c of name) h = (h*31 + c.charCodeAt(0)) % colors.length;
+      return colors[h];
+    };
+    $("peopleList").innerHTML = top.map(p => `
+      <div class="person-row">
+        <div class="person-avatar" style="background:${avatarColor(p.name)}">${p.name[0].toUpperCase()}</div>
+        <div class="person-info">
+          <div class="person-name">${escHtml(p.name)}</div>
+          <div class="person-count">${p.count} payment${p.count!==1?"s":""}</div>
+        </div>
+        <div class="person-total">${fmt(p.amount)}</div>
+      </div>`).join("");
   }
-  const max = totals[0].amount;
-  container.innerHTML = totals
-    .map(
-      (t) => `
-      <div class="merchant-row">
-        <div class="merchant-name">${escapeHtml(t.merchant)}</div>
-        <div class="merchant-bar-track">
-          <div class="merchant-bar-fill" style="width:${Math.max(4, (t.amount / max) * 100)}%"></div>
-        </div>
-        <div class="merchant-amount">${formatRupee(t.amount)}</div>
-      </div>`
-    )
-    .join("");
+
+  // Recent txns
+  const recent = getRecentTxns(15);
+  if (recent.length === 0) { $("txnList").innerHTML = '<div class="empty-state">Nothing yet.</div>'; }
+  else $("txnList").innerHTML = recent.map(t => {
+    const d = new Date(t.date);
+    const ds = d.toLocaleDateString("en-IN",{day:"numeric",month:"short"}) + " · " +
+      d.toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"});
+    return `<div class="txn-row">
+      <div><div class="txn-name">${escHtml(t.contactName)}</div><div class="txn-date">${ds}</div></div>
+      <div class="txn-right"><div class="txn-amount">${fmt(t.amount)}</div>
+      <div class="txn-badge ${t.status}">${t.status}</div></div>
+    </div>`;
+  }).join("");
 }
 
-function renderTxnList() {
-  const txns = getTxns();
-  const container = $("txnList");
-  if (txns.length === 0) {
-    container.innerHTML = '<div class="empty-state">Nothing logged yet.</div>';
-    return;
-  }
-  container.innerHTML = txns
-    .slice(0, 50)
-    .map((t) => {
-      const d = new Date(t.date);
-      const dateStr = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) +
-        " · " + d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-      return `
-      <div class="txn-row">
-        <div class="txn-main">
-          <span class="txn-merchant">${escapeHtml(t.merchant)}</span>
-          <span class="txn-date">${dateStr}</span>
-        </div>
-        <div class="txn-amount-col">
-          <div class="txn-amount">${formatRupee(t.amount)}</div>
-          <div class="txn-badge ${t.status}">${t.status}</div>
-        </div>
-      </div>`;
-    })
-    .join("");
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
-}
-
-// ---------------- Settings ----------------
-
-function loadSettingsForm() {
+// ── Settings ──
+function loadSettings() {
   const cfg = getConfig();
   $("inputLimit").value = cfg.weeklyLimit;
   $("inputWeekStart").value = String(cfg.weekStartDay);
 }
-
 $("btnSaveSettings").addEventListener("click", () => {
-  const weeklyLimit = Math.max(0, Number($("inputLimit").value) || 0);
-  const weekStartDay = Number($("inputWeekStart").value);
-  setConfig({ weeklyLimit, weekStartDay });
-  renderGauge();
-  showToast("Saved");
+  setConfig({ weeklyLimit: Math.max(0, Number($("inputLimit").value)||0), weekStartDay: Number($("inputWeekStart").value) });
+  renderGauge(); toast("Saved ✓");
 });
-
 $("btnExport").addEventListener("click", () => {
-  const blob = new Blob([exportData()], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `weekly-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  showToast("Backup downloaded");
+  a.href = URL.createObjectURL(new Blob([exportData()],{type:"application/json"}));
+  a.download = "weekly-gate-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click(); toast("Backup exported");
 });
-
 $("btnImport").addEventListener("click", () => $("fileImport").click());
-
-$("fileImport").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      importData(reader.result);
-      renderGauge();
-      renderMerchantList();
-      renderTxnList();
-      loadSettingsForm();
-      showToast("Backup restored");
-    } catch {
-      showToast("That file couldn't be read");
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = "";
+$("fileImport").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { importData(r.result); renderGauge(); renderAnalytics(); loadSettings(); toast("Restored ✓"); }
+    catch { toast("Couldn't read that file"); } };
+  r.readAsText(f); e.target.value = "";
 });
-
 $("btnResetData").addEventListener("click", () => {
-  if (confirm("Erase the weekly limit and all logged payments on this phone? This can't be undone.")) {
-    resetAllData();
-    renderGauge();
-    renderMerchantList();
-    renderTxnList();
-    loadSettingsForm();
-    showToast("All data erased");
+  if (confirm("Erase all data? This can't be undone.")) {
+    resetAllData(); renderGauge(); renderAnalytics(); loadSettings(); toast("Erased");
   }
 });
 
-// ---------------- Init ----------------
+// ── Utils ──
+function escHtml(s) { return String(s).replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c])); }
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch(() => {});
-  });
-}
+// ── Init ──
+if ("serviceWorker" in navigator)
+  window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js").catch(()=>{}));
 
 renderGauge();
-loadSettingsForm();
-resumePendingIfAny();
+loadSettings();

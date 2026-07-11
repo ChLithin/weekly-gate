@@ -1,187 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<meta name="theme-color" content="#F1EAD9" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Weekly Ledger</title>
-<link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
-<link rel="stylesheet" href="css/style.css" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"/>
+<meta name="theme-color" content="#0A0A12"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Weekly Gate</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
+<header class="app-header">
+  <span class="app-wordmark">Weekly Gate</span>
+  <span class="app-streak" id="headerStreak" hidden>🔥 0 weeks</span>
+  <span class="app-reset" id="headerReset"></span>
+</header>
 
-  <header class="ledger-head">
-    <div class="ledger-head-top">
-      <span class="wordmark">Weekly Ledger</span>
-      <span class="ledger-date" id="gaugeReset">resets in 7 days</span>
+<main>
+  <!-- HOME VIEW -->
+  <section id="view-home" class="view active">
+    <div class="gauge-screen">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 220 220">
+          <circle class="gauge-track" cx="110" cy="110" r="90"
+            stroke-dasharray="565" stroke-dashoffset="0"/>
+          <circle class="gauge-fill" id="gaugeFill" cx="110" cy="110" r="90"
+            stroke-dasharray="565" stroke-dashoffset="565" stroke="var(--accent)"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-label">Left this week</div>
+          <div class="gauge-amount" id="gaugeAmount">₹0</div>
+          <div class="gauge-of" id="gaugeOf">of ₹0</div>
+          <div class="gauge-pct" id="gaugePct">0% used</div>
+        </div>
+      </div>
+
+      <button class="pay-btn" id="btnPay">Pay →</button>
+
+      <div class="week-bar" style="margin-top:20px">
+        <div class="week-bar-label">This week</div>
+        <div class="week-bar-track"><div class="week-bar-fill" id="weekBarFill" style="width:0%"></div></div>
+        <div class="week-bar-stats">
+          <span class="week-bar-stat" id="wbSpent">₹0 spent</span>
+          <span class="week-bar-stat" id="wbReset" style="color:var(--text-faint)"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYTICS VIEW -->
+  <section id="view-analytics" class="view">
+    <div class="stat-cards">
+      <div class="stat-card"><div class="stat-card-label">🔥 Streak</div><div class="stat-card-value streak" id="statStreak">0 wks</div></div>
+      <div class="stat-card"><div class="stat-card-label">This week</div><div class="stat-card-value" id="statSpent">₹0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Payments</div><div class="stat-card-value green" id="statCount">0</div></div>
+      <div class="stat-card"><div class="stat-card-label">Biggest</div><div class="stat-card-value" id="statBiggest">₹0</div></div>
     </div>
 
-    <div class="stamp-wrap">
-      <svg class="stamp" viewBox="0 0 160 160" aria-hidden="true">
-        <circle cx="80" cy="80" r="68" class="stamp-ring-outer" />
-        <circle cx="80" cy="80" r="56" class="stamp-ring-inner" />
-        <text x="80" y="75" text-anchor="middle" class="stamp-amount" id="stampAmount">₹1,000</text>
-        <text x="80" y="96" text-anchor="middle" class="stamp-label">LEFT THIS WEEK</text>
-      </svg>
-      <svg class="stamp-over" viewBox="0 0 168 90" id="stampOver" hidden aria-hidden="true">
-        <rect x="4" y="4" width="160" height="82" class="stamp-over-rect" />
-        <text x="84" y="55" text-anchor="middle" class="stamp-over-text">OVER LIMIT</text>
-      </svg>
+    <div class="weekly-chart">
+      <div class="section-head">8-week spend</div>
+      <div class="chart-bars" id="chartBars"></div>
     </div>
 
-    <div class="ledger-track">
-      <div class="ledger-track-fill" id="gaugeFill" style="width: 0%"></div>
+    <div class="section-head">Top payees</div>
+    <div class="people-list" id="peopleList"><div class="empty-state">No payments yet.</div></div>
+
+    <div class="section-head" style="margin-top:18px">Recent</div>
+    <div id="txnList"><div class="empty-state">Nothing yet.</div></div>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section id="view-settings" class="view">
+    <div class="section-head">Budget</div>
+    <div class="field"><label>Weekly limit (₹)</label><input type="number" id="inputLimit" inputmode="numeric" min="0" step="50"/></div>
+    <div class="field"><label>Week resets on</label>
+      <select id="inputWeekStart">
+        <option value="1">Monday</option><option value="0">Sunday</option>
+        <option value="6">Saturday</option><option value="5">Friday</option>
+      </select>
     </div>
-    <div class="ledger-of" id="gaugeOf">of ₹1,000 weekly limit</div>
-  </header>
+    <button class="sheet-btn sheet-btn-primary" id="btnSaveSettings">Save</button>
 
-  <main>
+    <div class="divider"></div>
+    <div class="section-head">Backup</div>
+    <p class="about-note">Safari clears PWA storage after ~7 days of inactivity. Export regularly.</p>
+    <div class="btn-row">
+      <button class="sheet-btn sheet-btn-ghost" id="btnExport">Export</button>
+      <button class="sheet-btn sheet-btn-ghost" id="btnImport">Import</button>
+    </div>
+    <input type="file" id="fileImport" accept="application/json" hidden/>
 
-    <!-- SCAN VIEW -->
-    <section id="view-scan" class="view active">
+    <div class="divider"></div>
+    <div class="section-head">Danger</div>
+    <button class="sheet-btn sheet-btn-danger" id="btnResetData" style="margin-top:4px">Erase all data</button>
+  </section>
+</main>
 
-      <div id="scanIdle" class="scan-stage">
-        <div class="scan-placeholder">
-          <p>Point your camera at any UPI QR code. We'll check this week's ledger before you settle the payment.</p>
-          <button class="btn btn-primary" id="btnStartScan">Scan a QR code</button>
-        </div>
-      </div>
+<!-- PAYMENT SHEET -->
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="sheet" id="paySheet">
+  <div class="sheet-handle"></div>
 
-      <div id="scanLive" class="scan-stage" hidden>
-        <video id="scanVideo" class="scan-video" playsinline muted></video>
-        <canvas id="scanCanvas" hidden></canvas>
-        <div class="scan-frame"></div>
-      </div>
-      <button class="btn btn-ghost" id="btnCancelScan" hidden style="margin-top:10px;">Cancel</button>
+  <!-- State: input -->
+  <div class="sheet-state active" id="stateInput">
+    <div class="sheet-title">Pay</div>
+    <div class="amount-row">
+      <span class="amount-symbol">₹</span>
+      <input class="amount-field" id="amountField" type="number" inputmode="decimal" placeholder="0" autofocus/>
+    </div>
 
-      <div id="scanConfirm" class="confirm-card" hidden style="margin-top:16px;">
-        <div class="ledger-field-label">Particulars</div>
-        <div class="confirm-merchant" id="confirmMerchant">Merchant</div>
-        <div class="confirm-vpa" id="confirmVpa">vpa@bank</div>
+    <div class="contact-label">Paying who?</div>
+    <div class="contact-input-wrap">
+      <input class="contact-input" id="contactInput" type="text" placeholder="Name or search saved..." autocomplete="off"/>
+      <div class="contact-dropdown" id="contactDropdown" hidden></div>
+    </div>
 
-        <div class="ledger-field-label">Amount</div>
-        <input type="number" inputmode="decimal" class="amount-input" id="amountInput" placeholder="Enter amount" hidden />
-        <div class="confirm-amount" id="confirmAmount" hidden>₹0</div>
+    <div class="budget-status" id="budgetStatus" hidden></div>
+    <button class="sheet-btn sheet-btn-primary" id="btnConfirmPay" disabled>Continue</button>
+    <button class="sheet-btn sheet-btn-ghost" id="btnCancelSheet">Cancel</button>
+  </div>
 
-        <span class="status-pill" id="confirmPill">Within budget</span>
-        <div id="confirmRemainingNote" class="fallback-note" style="display:none;"></div>
+  <!-- State: waiting -->
+  <div class="sheet-state" id="stateWaiting">
+    <div class="waiting-wrap">
+      <span class="waiting-coin">₹</span>
+      <div class="waiting-amount" id="waitingAmount">₹0</div>
+      <div class="waiting-label">is reserved for <strong id="waitingContact"></strong>.<br/>Go open your UPI app and pay this amount.</div>
+      <div class="waiting-sub">Come back here once you're done.</div>
+    </div>
+    <button class="sheet-btn sheet-btn-success" id="btnMarkPaid">✓ Yes, I paid</button>
+    <button class="sheet-btn sheet-btn-ghost" id="btnMarkCancelled">✗ Didn't pay</button>
+  </div>
 
-        <div class="settle-label">Settle via</div>
-        <div class="settle-via">
-          <button class="btn btn-primary pay-app-btn" data-app="phonepe">
-            <span class="pay-app-name">PhonePe</span><span class="pay-app-hint">phonepe://</span>
-          </button>
-          <button class="btn btn-ghost pay-app-btn" data-app="default">
-            <span class="pay-app-name">Default UPI app</span><span class="pay-app-hint">upi://</span>
-          </button>
-          <button class="btn btn-ghost pay-app-btn" data-app="gpay">
-            <span class="pay-app-name">Google Pay</span><span class="pay-app-hint">gpay://</span>
-          </button>
-          <button class="btn btn-ghost pay-app-btn" data-app="paytm">
-            <span class="pay-app-name">Paytm</span><span class="pay-app-hint">paytm://</span>
-          </button>
-        </div>
+  <!-- State: success -->
+  <div class="sheet-state" id="stateSuccess">
+    <div class="success-wrap">
+      <div class="coins-container" id="coinsContainer"></div>
+      <div class="success-icon">✅</div>
+      <div class="success-amount" id="successAmount">₹0</div>
+      <div class="success-contact" id="successContact"></div>
+      <div class="success-msg" id="successMsg"></div>
+    </div>
+    <button class="sheet-btn sheet-btn-primary" id="btnDone" style="margin-top:20px">Done</button>
+  </div>
 
-        <button class="btn btn-ghost" id="btnRescan" style="margin-top:12px;">Scan something else</button>
+  <!-- State: fail -->
+  <div class="sheet-state" id="stateFail">
+    <div class="fail-wrap">
+      <div class="fail-icon">↩️</div>
+      <div class="fail-amount" id="failAmount">₹0</div>
+      <div class="fail-msg">No worries — <strong id="failAmountReturn"></strong> is back in your budget.</div>
+    </div>
+    <button class="sheet-btn sheet-btn-ghost" id="btnFailDone">Close</button>
+  </div>
+</div>
 
-        <div class="fallback-note">
-          PhonePe is confirmed working on your phone. BHIM doesn't get its own button — its link scheme
-          has failed four different ways across testing. "Default UPI app" currently hands off to
-          WhatsApp on your phone, not BHIM, since WhatsApp is claiming that shared link first. If you
-          need BHIM specifically, copy the details and pay there manually:
-          <button id="btnCopyVpa">Copy UPI ID</button>
-        </div>
-      </div>
+<div class="toast" id="toast"></div>
 
-      <div id="scanFollowup" class="confirm-card" hidden style="margin-top:16px;">
-        <div class="ledger-field-label">Confirm entry</div>
-        <div class="confirm-merchant" style="margin-bottom:6px;">Did the payment go through?</div>
-        <p style="color:var(--ink-dim); font-size:13px; margin:0 0 16px; line-height:1.55;">
-          Your UPI app handles the actual transfer — this app can't see the result automatically on
-          iPhone, so confirm here to keep the ledger accurate.
-        </p>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="btnMarkPaid">Yes, paid</button>
-          <button class="btn btn-ghost" id="btnMarkFailed">No / cancelled</button>
-        </div>
-      </div>
+<nav class="tabbar">
+  <button data-view="home" class="active"><span class="tab-icon">💰</span>Budget</button>
+  <button data-view="analytics"><span class="tab-icon">📊</span>Analytics</button>
+  <button data-view="settings"><span class="tab-icon">⚙️</span>Settings</button>
+</nav>
 
-    </section>
-
-    <!-- HISTORY VIEW -->
-    <section id="view-history" class="view">
-      <h2 class="section-title">Spend by merchant</h2>
-      <div id="merchantList"><div class="empty-state">No payments yet.</div></div>
-
-      <div class="divider"></div>
-
-      <h2 class="section-title">Recent entries</h2>
-      <div id="txnList"><div class="empty-state">Nothing logged yet.</div></div>
-    </section>
-
-    <!-- SETTINGS VIEW -->
-    <section id="view-settings" class="view">
-      <h2 class="section-title">Weekly budget</h2>
-
-      <div class="field">
-        <label for="inputLimit">Weekly limit (₹)</label>
-        <input type="number" id="inputLimit" inputmode="numeric" min="0" step="50" />
-      </div>
-
-      <div class="field">
-        <label for="inputWeekStart">Week resets on</label>
-        <select id="inputWeekStart">
-          <option value="1">Monday</option>
-          <option value="0">Sunday</option>
-          <option value="6">Saturday</option>
-          <option value="5">Friday</option>
-        </select>
-      </div>
-
-      <button class="btn btn-primary" id="btnSaveSettings">Save</button>
-
-      <div class="divider"></div>
-
-      <h2 class="section-title">Backup</h2>
-      <p class="about-note">Safari can clear stored data after a week of not opening this app. Export a backup now and then so you don't lose your ledger.</p>
-      <div class="btn-row">
-        <button class="btn btn-ghost" id="btnExport">Export backup</button>
-        <button class="btn btn-ghost" id="btnImport">Import backup</button>
-      </div>
-      <input type="file" id="fileImport" accept="application/json" hidden />
-
-      <div class="divider"></div>
-
-      <h2 class="section-title">About &amp; limits</h2>
-      <p class="about-note">
-        This app keeps its own ledger on your phone — separate from your bank balance. It cannot control
-        whether BHIM or any other app uses UPI Lite or asks for a PIN; that's decided inside that app, not
-        this one. On iPhone, several UPI apps can register the same generic payment link, so "Default UPI
-        app" may open something other than BHIM — use the named app buttons, or settle manually, when that
-        matters. It also can't stop you from opening an app directly and skipping this gate — it only works
-        if scanning here is the habit you build. All data stays on this device.
-      </p>
-
-      <button class="btn btn-danger" id="btnResetData" style="margin-top:18px;">Erase all data</button>
-    </section>
-
-  </main>
-
-  <div class="toast" id="toast"></div>
-
-  <nav class="tabbar">
-    <button data-view="scan" class="active">Scan</button>
-    <button data-view="history">History</button>
-    <button data-view="settings">Settings</button>
-  </nav>
-
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
-  <script src="js/storage.js" defer></script>
-  <script src="js/upi.js" defer></script>
-  <script src="js/scanner.js" defer></script>
-  <script src="js/app.js" defer></script>
+<script src="js/storage.js" defer></script>
+<script src="js/upi.js" defer></script>
+<script src="js/app.js" defer></script>
 </body>
 </html>
